@@ -19,14 +19,15 @@ const router = express.Router();
 
 // ─── POST /api/scans — Start a new scan ──────────────
 router.post('/', protect, async (req, res) => {
-  const { targetUrl, scanType } = req.body;
+  const { targetUrl, scanType, scanName } = req.body;
 
   if (!targetUrl) {
     return res.status(400).json({ message: 'targetUrl is required' });
   }
 
+  const trimmedName = (scanName || '').trim();
   const scanId = crypto.randomUUID();
-  const entry = createScanEntry(scanId, targetUrl, req.user._id.toString());
+  const entry = createScanEntry(scanId, targetUrl, req.user._id.toString(), trimmedName);
 
   // Persist initial scan document to MongoDB
   try {
@@ -34,6 +35,7 @@ router.post('/', protect, async (req, res) => {
       scanId,
       userId: req.user._id,
       targetUrl,
+      scanName: trimmedName,
       status: 'running',
       createdAt: entry.createdAt,
     });
@@ -46,6 +48,7 @@ router.post('/', protect, async (req, res) => {
     scanId,
     status: 'running',
     targetUrl,
+    scanName: trimmedName,
     createdAt: entry.createdAt,
   });
 

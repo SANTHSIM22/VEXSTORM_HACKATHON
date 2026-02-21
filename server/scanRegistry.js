@@ -5,10 +5,11 @@
 
 const scanRegistry = new Map();
 
-function createScanEntry(scanId, targetUrl, userId) {
+function createScanEntry(scanId, targetUrl, userId, scanName = '') {
   const entry = {
     scanId,
     targetUrl,
+    scanName,
     userId,
     status: 'running',
     createdAt: new Date().toISOString(),
