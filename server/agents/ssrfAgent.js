@@ -12,6 +12,41 @@ class SSRFAgent extends BaseAgent {
         this.validator = new ValidationEngine(logger);
     }
 
+    /**
+     * Calculates confidence for SSRF findings based on response behavior and internal indicators.
+     * @param {object} factors
+     * @param {string}  factors.context - 'param' | 'form'
+     * @param {boolean} factors.bodyChanged - Response body differed from baseline
+     * @param {number}  factors.anomalyScore - Anomaly score from validation engine (0-1)
+     * @param {boolean} factors.statusChanged - HTTP status changed from baseline
+     * @param {number}  factors.internalIndicatorsMatched - Number of internal data indicators found in response
+     * @param {boolean} factors.containsMetadata - Response contains cloud metadata keywords
+     * @param {boolean} factors.containsLocalhostRef - Response contains localhost/127.0.0.1 references
+     * @param {boolean} factors.paramNameRelevant - Parameter name strongly suggests URL input
+     * @returns {number} Confidence score between 0.1 and 1.0
+     */
+    _calculateConfidence({ context = 'param', bodyChanged = false, anomalyScore = 0, statusChanged = false, internalIndicatorsMatched = 0, containsMetadata = false, containsLocalhostRef = false, paramNameRelevant = false }) {
+        let score = 0.15; // base
+
+        // Response behavior
+        if (bodyChanged) score += 0.1;
+        if (statusChanged) score += 0.1;
+        score += Math.min(anomalyScore * 0.15, 0.15);
+
+        // Internal data indicators — strong evidence
+        if (internalIndicatorsMatched > 0) score += Math.min(internalIndicatorsMatched * 0.15, 0.35);
+        if (containsMetadata) score += 0.1;
+        if (containsLocalhostRef) score += 0.05;
+
+        // Parameter relevance
+        if (paramNameRelevant) score += 0.05;
+
+        // Form-based SSRF is slightly more confirmed (user-facing input)
+        if (context === 'form') score += 0.05;
+
+        return Math.max(0.1, Math.min(1.0, parseFloat(score.toFixed(2))));
+    }
+
     async execute(target) {
         const findings = [];
         const { parameters, forms } = this.memory.attackSurface;
@@ -96,7 +131,7 @@ class SSRFAgent extends BaseAgent {
                         description: `Potential SSRF via parameter "${paramName}" targeting ${payload.type}`,
                         evidence: `Response changed when pointing to ${payload.value}. Anomaly: ${comparison.anomalyScore}${matched.length > 0 ? '. Internal data indicators detected.' : ''}`,
                         payload: payload.value,
-                        confidenceScore: matched.length > 0 ? 0.9 : 0.5,
+                        confidenceScore: this._calculateConfidence({ context: 'param', bodyChanged: comparison.bodyChanged, anomalyScore: comparison.anomalyScore, statusChanged: testResponse.status !== baselineResponse.status, internalIndicatorsMatched: matched.length, containsMetadata: /computeMetadata|meta-data|instance-id/i.test(body), containsLocalhostRef: /localhost|127\.0\.0\.1/i.test(body), paramNameRelevant: /url|link|href|redirect|fetch|src|uri/i.test(paramName) }),
                         impact: 'Access to internal services, cloud metadata theft, internal network scanning',
                         reproductionSteps: [
                             `1. Send request to: ${testUrl}`,
@@ -123,6 +158,9 @@ class SSRFAgent extends BaseAgent {
                 const body = typeof response.data === 'string' ? response.data : JSON.stringify(response.data || '');
 
                 if (body.length > 0 && /localhost|127\.0\.0\.1|internal|root:|daemon:|computeMetadata/i.test(body)) {
+                    const hasMetadata = /computeMetadata|meta-data|instance-id/i.test(body);
+                    const hasLocalhost = /localhost|127\.0\.0\.1/i.test(body);
+                    const internalMatches = [/localhost/i, /127\.0\.0\.1/, /internal/i, /root:|daemon:/i, /computeMetadata/i].filter(p => p.test(body));
                     this.addFinding({
                         type: 'SSRF',
                         endpoint: action,
@@ -130,7 +168,7 @@ class SSRFAgent extends BaseAgent {
                         description: `Potential SSRF via form field "${inputName}"`,
                         evidence: `Response contains localhost/internal references when submitting ${payload}`,
                         payload,
-                        confidenceScore: 0.8,
+                        confidenceScore: this._calculateConfidence({ context: 'form', bodyChanged: true, internalIndicatorsMatched: internalMatches.length, containsMetadata: hasMetadata, containsLocalhostRef: hasLocalhost, paramNameRelevant: /url|link|href|redirect|fetch|src|uri/i.test(inputName) }),
                         impact: 'Internal network access, sensitive data exposure',
                         reproductionSteps: [
                             `1. Navigate to the form at: ${action}`,

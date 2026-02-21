@@ -8,6 +8,81 @@ class AuthAgent extends BaseAgent {
         this.goal = "Identify authentication and session management weaknesses, including brute-force vulnerabilities, weak credentials, and insecure cookie configurations through behavioral analysis.";
     }
 
+    /**
+     * Calculates confidence score for authentication findings based on evidence signals.
+     * @param {object} factors
+     * @param {string}  factors.vulnType - 'httpForm' | 'csrf' | 'autocomplete' | 'rateLimit' | 'weakCreds' | 'jwtAlgo' | 'jwtInfo' | 'cookie'
+     * @param {boolean} factors.isHttp - Uses insecure HTTP transport
+     * @param {boolean} factors.hasPasswordField - Form has a password field
+     * @param {boolean} factors.noCsrfToken - No CSRF token present
+     * @param {boolean} factors.no429 - No 429 rate-limit response received
+     * @param {number}  factors.requestDuration - Duration of rapid requests in ms
+     * @param {boolean} factors.llmConfirms - LLM analysis confirms suspicion
+     * @param {boolean} factors.tokenReturned - Auth token returned on login
+     * @param {boolean} factors.sessionEstablished - Session cookie set
+     * @param {boolean} factors.emailMatched - Response email matches cred email
+     * @param {string}  factors.algorithm - JWT algorithm (e.g. 'none', 'HS256')
+     * @param {boolean} factors.containsAdminClaim - JWT payload contains admin role
+     * @param {boolean} factors.hasRoleClaim - JWT payload has explicit role/admin claim
+     * @param {boolean} factors.missingHttpOnly - Cookie missing HttpOnly flag
+     * @param {boolean} factors.missingSecure - Cookie missing Secure flag
+     * @param {number}  factors.successIndicatorCount - Number of login success indicators triggered
+     * @returns {number} Confidence score between 0.1 and 1.0
+     */
+    _calculateConfidence({ vulnType, isHttp = false, hasPasswordField = false, noCsrfToken = false, no429 = false, requestDuration = Infinity, llmConfirms = false, tokenReturned = false, sessionEstablished = false, emailMatched = false, algorithm = '', containsAdminClaim = false, hasRoleClaim = false, missingHttpOnly = false, missingSecure = false, successIndicatorCount = 0 }) {
+        let score = 0;
+
+        switch (vulnType) {
+            case 'httpForm':
+                score = 0.5;
+                if (isHttp) score += 0.3;
+                if (hasPasswordField) score += 0.15;
+                break;
+            case 'csrf':
+                score = 0.35;
+                if (noCsrfToken) score += 0.3;
+                if (hasPasswordField) score += 0.15;
+                break;
+            case 'autocomplete':
+                score = 0.2;
+                if (hasPasswordField) score += 0.2;
+                // lower confidence since this is a best-practice issue, not a direct exploit
+                break;
+            case 'rateLimit':
+                score = 0.3;
+                if (no429) score += 0.2;
+                if (requestDuration < 2000) score += 0.15;
+                if (llmConfirms) score += 0.15;
+                break;
+            case 'weakCreds':
+                score = 0.4;
+                if (tokenReturned) score += 0.25;
+                if (sessionEstablished) score += 0.15;
+                if (emailMatched) score += 0.1;
+                if (successIndicatorCount >= 2) score += 0.1;
+                break;
+            case 'jwtAlgo':
+                score = 0.4;
+                if (algorithm === 'none') score += 0.5;
+                else if (algorithm === 'HS256') score += 0.25;
+                break;
+            case 'jwtInfo':
+                score = 0.35;
+                if (containsAdminClaim) score += 0.3;
+                if (hasRoleClaim) score += 0.2;
+                break;
+            case 'cookie':
+                score = 0.4;
+                if (missingHttpOnly) score += 0.25;
+                if (missingSecure) score += 0.25;
+                break;
+            default:
+                score = 0.5;
+        }
+
+        return Math.max(0.1, Math.min(1.0, parseFloat(score.toFixed(2))));
+    }
+
     async execute(target) {
         this.logger.info(`[AuthAgent] Goal: ${this.goal}`);
         const findings = [];
@@ -51,7 +126,7 @@ class AuthAgent extends BaseAgent {
                     type: 'Authentication Weakness',
                     endpoint: form.action,
                     description: 'Login form submits credentials over insecure HTTP',
-                    confidenceScore: 0.95,
+                    confidenceScore: this._calculateConfidence({ vulnType: 'httpForm', isHttp: true, hasPasswordField: form.hasPasswordField }),
                     impact: 'Credential compromise',
                     reproductionSteps: [`Check if form action is HTTP: ${form.action}`]
                 });
@@ -61,7 +136,7 @@ class AuthAgent extends BaseAgent {
                     type: 'Authentication Weakness',
                     endpoint: form.action,
                     description: 'Login form lacks CSRF protection',
-                    confidenceScore: 0.8,
+                    confidenceScore: this._calculateConfidence({ vulnType: 'csrf', noCsrfToken: true, hasPasswordField: form.hasPasswordField }),
                     impact: 'Login CSRF',
                     reproductionSteps: [`Inspect form at ${form.action} for CSRF tokens`]
                 });
@@ -74,7 +149,7 @@ class AuthAgent extends BaseAgent {
                         endpoint: form.action,
                         parameter: pf.name,
                         description: 'Password field allows autocomplete',
-                        confidenceScore: 0.5,
+                        confidenceScore: this._calculateConfidence({ vulnType: 'autocomplete', hasPasswordField: true }),
                         impact: 'Credential exposure',
                         reproductionSteps: [`Check autocomplete attribute on password field "${pf.name}"`]
                     });
@@ -109,7 +184,7 @@ class AuthAgent extends BaseAgent {
                     endpoint: endpoint,
                     description: `Endpoint lacks brute force protection. ${analysis.reasoning || ''}`,
                     evidence: `${count} attempts in ${duration}ms. Statuses: ${[...new Set(statuses)].join(',')}`,
-                    confidenceScore: 0.8,
+                    confidenceScore: this._calculateConfidence({ vulnType: 'rateLimit', no429: !statuses.includes(429), requestDuration: duration, llmConfirms: !!analysis.suspicious }),
                     impact: 'Account takeover',
                     reproductionSteps: [`Send ${count} requests rapidly to ${endpoint}`]
                 });
@@ -175,7 +250,7 @@ class AuthAgent extends BaseAgent {
                         endpoint: api,
                         description: `Successful login with feasible credential: ${cred.username || cred.email}`,
                         evidence: `Credential: ${JSON.stringify(cred)}. Indicator: ${res.data.token ? 'JWT returned' : 'Cookie/Session established'}`,
-                        confidenceScore: 0.95,
+                        confidenceScore: this._calculateConfidence({ vulnType: 'weakCreds', tokenReturned: !!(res.data.token), sessionEstablished: !!(res.status === 302 && res.headers['set-cookie']), emailMatched: !!(res.data?.user?.email === cred.email), successIndicatorCount: successIndicators.filter(i => i).length }),
                         impact: 'Full account takeover and data access',
                         reproductionSteps: [
                             `1. Run: curl -X POST "${api}" -H "Content-Type: application/json" -d '${JSON.stringify(cred)}'`,
@@ -207,7 +282,7 @@ class AuthAgent extends BaseAgent {
                                 endpoint: url,
                                 description: `Insecure JWT algorithm detected: ${header.alg}`,
                                 evidence: `Header: ${JSON.stringify(header)}, Payload Snippet: ${JSON.stringify(payload).substring(0, 50)}...`,
-                                confidenceScore: 0.9,
+                                confidenceScore: this._calculateConfidence({ vulnType: 'jwtAlgo', algorithm: header.alg }),
                                 impact: 'Potential token forgery or privilege escalation',
                                 reproductionSteps: [`Find JWT in response from ${url} and verify 'alg' header at jwt.io`]
                             });
@@ -219,7 +294,7 @@ class AuthAgent extends BaseAgent {
                                 endpoint: url,
                                 description: 'Sensitive information (admin role) exposed in client-side JWT',
                                 evidence: `Payload: ${JSON.stringify(payload)}`,
-                                confidenceScore: 0.85,
+                                confidenceScore: this._calculateConfidence({ vulnType: 'jwtInfo', containsAdminClaim: true, hasRoleClaim: !!(payload.role || payload.isAdmin || payload.admin) }),
                                 impact: 'Information disclosure, privilege escalation target',
                                 reproductionSteps: [`Examine JWT payload from ${url} for sensitive claims`]
                             });
@@ -242,7 +317,7 @@ class AuthAgent extends BaseAgent {
                         parameter: cookie.split('=')[0],
                         description: 'Insecure cookie flags',
                         evidence: `Cookie: ${cookie}`,
-                        confidenceScore: 0.9,
+                        confidenceScore: this._calculateConfidence({ vulnType: 'cookie', missingHttpOnly: !/httponly/i.test(cookie), missingSecure: !/secure/i.test(cookie) }),
                         impact: 'Session hijacking',
                         reproductionSteps: [`Check set-cookie header for Secure/HttpOnly flags`]
                     });

@@ -6,6 +6,32 @@ class DependencyAgent extends BaseAgent {
         super('DependencyAgent', 'A06 - Vulnerable Components', logger, memory, findingsStore);
     }
 
+    /**
+     * Calculates confidence for vulnerable component findings based on detection signals.
+     * @param {object} factors
+     * @param {string}  factors.source - 'filename' | 'pageBody' – where the version was detected
+     * @param {boolean} factors.exactVersionMatch - Whether an exact vulnerable version was matched (not just prefix)
+     * @param {boolean} factors.hasCVE - Whether there's a known CVE for this version
+     * @param {number}  factors.vulnVersionPrefixMatches - How many prefix patterns matched the detected version
+     * @returns {number} Confidence score between 0.1 and 1.0
+     */
+    _calculateConfidence({ source = 'filename', exactVersionMatch = false, hasCVE = false, vulnVersionPrefixMatches = 0 }) {
+        let score = 0.25; // base
+
+        // Detection source reliability
+        if (source === 'filename') score += 0.2;       // filename is a strong signal
+        else if (source === 'pageBody') score += 0.1;  // page body is noisier
+
+        // Version match quality
+        if (exactVersionMatch) score += 0.2;
+        else if (vulnVersionPrefixMatches > 0) score += Math.min(vulnVersionPrefixMatches * 0.08, 0.16);
+
+        // CVE existence
+        if (hasCVE) score += 0.2;
+
+        return Math.max(0.1, Math.min(1.0, parseFloat(score.toFixed(2))));
+    }
+
     async execute(target) {
         const findings = [];
         const { jsFiles, urls } = this.memory.attackSurface;
@@ -30,13 +56,14 @@ class DependencyAgent extends BaseAgent {
                     const version = match[1] || 'unknown';
                     const isVuln = lib.vulnVersions.some(v => version.startsWith(v));
                     if (isVuln) {
+                        const matchedPrefixes = lib.vulnVersions.filter(v => version.startsWith(v));
                         this.addFinding({
                             type: 'Vulnerable Component',
                             endpoint: jsFile,
                             parameter: lib.name,
                             description: `${lib.name} v${version} - ${lib.description}`,
                             evidence: `Detected via filename: ${jsFile}`,
-                            confidenceScore: 0.8,
+                            confidenceScore: this._calculateConfidence({ source: 'filename', exactVersionMatch: lib.vulnVersions.includes(version), hasCVE: /CVE/.test(lib.description), vulnVersionPrefixMatches: matchedPrefixes.length }),
                             exploitScenario: `Attacker exploits known vulnerability in ${lib.name} ${version}`,
                             impact: 'Depends on specific vulnerability—may include XSS, RCE, or data compromise',
                             reproductionSteps: [
@@ -62,13 +89,14 @@ class DependencyAgent extends BaseAgent {
                         const version = match[1] || 'unknown';
                         const isVuln = lib.vulnVersions.some(v => version.startsWith(v));
                         if (isVuln) {
+                            const matchedPrefixes = lib.vulnVersions.filter(v => version.startsWith(v));
                             this.addFinding({
                                 type: 'Vulnerable Component',
                                 endpoint: url,
                                 parameter: lib.name,
                                 description: `${lib.name} v${version} detected in page - ${lib.description}`,
                                 evidence: `Pattern matched in response body`,
-                                confidenceScore: 0.7,
+                                confidenceScore: this._calculateConfidence({ source: 'pageBody', exactVersionMatch: lib.vulnVersions.includes(version), hasCVE: /CVE/.test(lib.description), vulnVersionPrefixMatches: matchedPrefixes.length }),
                                 exploitScenario: `Known vulnerabilities in ${lib.name} ${version} can be exploited`,
                                 impact: 'Varies per CVE—XSS, prototype pollution, or DoS',
                                 reproductionSteps: [

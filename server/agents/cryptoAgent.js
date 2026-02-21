@@ -6,6 +6,54 @@ class CryptoAgent extends BaseAgent {
         super('CryptoAgent', 'A02 - Cryptographic Failures', logger, memory, findingsStore);
     }
 
+    /**
+     * Calculates confidence for cryptographic failure findings.
+     * @param {object} factors
+     * @param {string}  factors.vulnType - 'httpProtocol' | 'noRedirect' | 'missingHSTS' | 'weakHSTS' | 'sensitiveParam'
+     * @param {boolean} factors.isHttp - Target uses HTTP
+     * @param {number}  factors.httpStatus - Response status code
+     * @param {boolean} factors.hstsPresent - Whether HSTS header exists
+     * @param {number}  factors.maxAge - HSTS max-age value in seconds
+     * @param {boolean} factors.paramNameHighlySensitive - e.g., 'password', 'secret', 'token'
+     * @param {boolean} factors.paramNameModerateSensitive - e.g., 'key', 'auth', 'session'
+     * @returns {number} Confidence score between 0.1 and 1.0
+     */
+    _calculateConfidence({ vulnType, isHttp = false, httpStatus = 0, hstsPresent = false, maxAge = 0, paramNameHighlySensitive = false, paramNameModerateSensitive = false }) {
+        let score = 0;
+
+        switch (vulnType) {
+            case 'httpProtocol':
+                score = 0.5;
+                if (isHttp) score += 0.4;               // confirmed HTTP
+                break;
+            case 'noRedirect':
+                score = 0.35;
+                if (isHttp) score += 0.2;                // confirmed HTTP
+                if (httpStatus >= 200 && httpStatus < 300) score += 0.2; // serves content over HTTP
+                if (httpStatus >= 400) score += 0.1;     // errors but still no redirect
+                break;
+            case 'missingHSTS':
+                score = 0.5;
+                if (!hstsPresent) score += 0.35;         // completely absent
+                break;
+            case 'weakHSTS':
+                score = 0.2;
+                if (maxAge < 86400) score += 0.35;       // less than a day
+                else if (maxAge < 2592000) score += 0.25; // less than 30 days
+                else if (maxAge < 31536000) score += 0.15; // less than a year
+                break;
+            case 'sensitiveParam':
+                score = 0.35;
+                if (paramNameHighlySensitive) score += 0.4;
+                else if (paramNameModerateSensitive) score += 0.25;
+                break;
+            default:
+                score = 0.5;
+        }
+
+        return Math.max(0.1, Math.min(1.0, parseFloat(score.toFixed(2))));
+    }
+
     async execute(target) {
         const findings = [];
         const { URL } = require('url');
@@ -19,7 +67,7 @@ class CryptoAgent extends BaseAgent {
                 parameter: 'protocol',
                 description: 'Application served over unencrypted HTTP',
                 evidence: `Protocol: ${parsed.protocol}`,
-                confidenceScore: 0.95,
+                confidenceScore: this._calculateConfidence({ vulnType: 'httpProtocol', isHttp: true }),
                 exploitScenario: 'All traffic including credentials can be intercepted via MITM attack',
                 impact: 'Complete data interception, credential theft, session hijacking',
                 reproductionSteps: [
@@ -41,7 +89,7 @@ class CryptoAgent extends BaseAgent {
                         parameter: 'HTTPS redirect',
                         description: 'No automatic redirect from HTTP to HTTPS',
                         evidence: `HTTP request returns status ${response.status} instead of 301/302 redirect`,
-                        confidenceScore: 0.85,
+                        confidenceScore: this._calculateConfidence({ vulnType: 'noRedirect', isHttp: true, httpStatus: response.status }),
                         exploitScenario: 'Users accessing the site via HTTP remain on unencrypted connection',
                         impact: 'Data exposure in transit',
                         reproductionSteps: [
@@ -65,7 +113,7 @@ class CryptoAgent extends BaseAgent {
                     parameter: 'HSTS',
                     description: 'Missing HTTP Strict Transport Security (HSTS) header',
                     evidence: 'No Strict-Transport-Security header in response',
-                    confidenceScore: 0.9,
+                    confidenceScore: this._calculateConfidence({ vulnType: 'missingHSTS', hstsPresent: false }),
                     exploitScenario: 'Browser does not enforce HTTPS, enabling SSL stripping attacks',
                     impact: 'Vulnerability to SSL stripping and MITM attacks',
                     reproductionSteps: [
@@ -83,7 +131,7 @@ class CryptoAgent extends BaseAgent {
                         parameter: 'HSTS max-age',
                         description: `HSTS max-age is too low: ${maxAge} seconds`,
                         evidence: `Strict-Transport-Security: ${hsts}`,
-                        confidenceScore: 0.6,
+                        confidenceScore: this._calculateConfidence({ vulnType: 'weakHSTS', maxAge }),
                         exploitScenario: 'Short HSTS max-age allows periodic windows for SSL stripping',
                         impact: 'Reduced HSTS protection effectiveness',
                         reproductionSteps: [
@@ -108,7 +156,7 @@ class CryptoAgent extends BaseAgent {
                                 parameter: key,
                                 description: `Sensitive data "${key}" exposed in URL parameter`,
                                 evidence: `Parameter "${key}" found in URL query string`,
-                                confidenceScore: 0.8,
+                                confidenceScore: this._calculateConfidence({ vulnType: 'sensitiveParam', paramNameHighlySensitive: /password|secret|ssn|credit|card/i.test(key), paramNameModerateSensitive: /token|key|api_key|auth|session/i.test(key) }),
                                 exploitScenario: 'Sensitive data in URLs is logged in browser history, server logs, and proxy logs',
                                 impact: 'Credential/token exposure via logs',
                                 reproductionSteps: [

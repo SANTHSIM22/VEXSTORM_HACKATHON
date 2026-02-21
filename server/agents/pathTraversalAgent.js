@@ -7,6 +7,43 @@ class PathTraversalAgent extends BaseAgent {
         this.goal = "Identify Path Traversal (LFI) and insecure File Upload vulnerabilities by testing file-related parameters and upload forms.";
     }
 
+    /**
+     * Calculates confidence for path traversal and file upload findings.
+     * @param {object} factors
+     * @param {string}  factors.vulnType - 'traversal' | 'uploadTransport' | 'uploadRestriction'
+     * @param {boolean} factors.sensitiveFileContent - Whether the response contained system file content (e.g. root:x:)
+     * @param {boolean} factors.statusIs200 - HTTP 200 response
+     * @param {boolean} factors.paramNameRelevant - Parameter name strongly matches file-related pattern
+     * @param {boolean} factors.isHttp - Upload form uses HTTP (not HTTPS)
+     * @param {boolean} factors.hasFileInput - Form has a file input element
+     * @returns {number} Confidence score between 0.1 and 1.0
+     */
+    _calculateConfidence({ vulnType, sensitiveFileContent = false, statusIs200 = false, paramNameRelevant = false, isHttp = false, hasFileInput = false }) {
+        let score = 0;
+
+        switch (vulnType) {
+            case 'traversal':
+                score = 0.2;
+                if (sensitiveFileContent) score += 0.5;     // definitive proof of LFI
+                if (statusIs200) score += 0.1;
+                if (paramNameRelevant) score += 0.1;
+                break;
+            case 'uploadTransport':
+                score = 0.25;
+                if (isHttp) score += 0.3;                   // insecure transport confirmed
+                if (hasFileInput) score += 0.15;
+                break;
+            case 'uploadRestriction':
+                score = 0.15;                               // low base – needs manual verification
+                if (hasFileInput) score += 0.15;
+                break;
+            default:
+                score = 0.3;
+        }
+
+        return Math.max(0.1, Math.min(1.0, parseFloat(score.toFixed(2))));
+    }
+
     async execute(target) {
         this.logger.info(`[PathTraversalAgent] Goal: ${this.goal}`);
         const { forms, parameters } = this.memory.attackSurface;
@@ -55,7 +92,7 @@ class PathTraversalAgent extends BaseAgent {
                         parameter: param,
                         description: 'Local File Inclusion / Path Traversal via sensitive parameters',
                         evidence: `Payload ${payload} returned sensitive file content`,
-                        confidenceScore: 0.95,
+                        confidenceScore: this._calculateConfidence({ vulnType: 'traversal', sensitiveFileContent: true, statusIs200: true, paramNameRelevant: /file|path|src|include|template/i.test(param) }),
                         impact: 'Full system compromise, data theft',
                         reproductionSteps: [`Open ${testUrl} and check for sensitive file contents`]
                     });
@@ -72,7 +109,7 @@ class PathTraversalAgent extends BaseAgent {
                 type: 'Insecure File Upload',
                 endpoint: form.action,
                 description: 'File upload form uses insecure transport',
-                confidenceScore: 0.7,
+                confidenceScore: this._calculateConfidence({ vulnType: 'uploadTransport', isHttp: true, hasFileInput: form.inputs.some(i => i.type === 'file') }),
                 impact: 'Interception of uploaded files',
                 reproductionSteps: [`Inspect upload form at ${form.action}`]
             });
@@ -84,7 +121,7 @@ class PathTraversalAgent extends BaseAgent {
             endpoint: form.action,
             description: 'Unrestricted file upload candidate - needs verification for extension filtering',
             evidence: `Upload form found at ${form.action}`,
-            confidenceScore: 0.4,
+            confidenceScore: this._calculateConfidence({ vulnType: 'uploadRestriction', hasFileInput: form.inputs.some(i => i.type === 'file') }),
             impact: 'Remote Code Execution (RCE)',
             reproductionSteps: [`Manually test ${form.action} by uploading .php, .asp, or .exe files`]
         });

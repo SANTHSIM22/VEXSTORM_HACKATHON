@@ -7,6 +7,59 @@ class ConfigAgent extends BaseAgent {
         super('ConfigAgent', 'A05 - Security Misconfiguration', logger, memory, findingsStore);
     }
 
+    /**
+     * Calculates confidence for security misconfiguration findings.
+     * @param {object} factors
+     * @param {string}  factors.vulnType - 'missingHeader' | 'infoLeak' | 'cors' | 'cookie' | 'debug' | 'httpMethods'
+     * @param {boolean} factors.headerAbsent - Whether a security header is completely absent
+     * @param {boolean} factors.isCriticalHeader - Whether the header is critical (CSP, X-Frame-Options, etc.)
+     * @param {boolean} factors.revealsTechnology - Whether the leak reveals exact technology/version
+     * @param {boolean} factors.isWildcardOrigin - CORS allows wildcard '*'
+     * @param {boolean} factors.reflectsArbitraryOrigin - CORS reflects arbitrary origin
+     * @param {number}  factors.contentLength - Response body length
+     * @param {boolean} factors.statusIs200 - HTTP 200 response
+     * @param {number}  factors.dangerousMethodCount - Number of dangerous HTTP methods enabled
+     * @returns {number} Confidence score between 0.1 and 1.0
+     */
+    _calculateConfidence({ vulnType, headerAbsent = false, isCriticalHeader = false, revealsTechnology = false, isWildcardOrigin = false, reflectsArbitraryOrigin = false, contentLength = 0, statusIs200 = false, dangerousMethodCount = 0 }) {
+        let score = 0;
+
+        switch (vulnType) {
+            case 'missingHeader':
+                score = 0.5;
+                if (headerAbsent) score += 0.2;
+                if (isCriticalHeader) score += 0.25;
+                break;
+            case 'infoLeak':
+                score = 0.5;
+                if (revealsTechnology) score += 0.35;
+                break;
+            case 'cors':
+                score = 0.4;
+                if (isWildcardOrigin) score += 0.3;
+                if (reflectsArbitraryOrigin) score += 0.25;
+                break;
+            case 'cookie':
+                score = 0.5;
+                if (isCriticalHeader) score += 0.3; // reusing for 'is session cookie'
+                break;
+            case 'debug':
+                score = 0.3;
+                if (statusIs200) score += 0.2;
+                if (contentLength > 200) score += 0.15;
+                else if (contentLength > 50) score += 0.1;
+                break;
+            case 'httpMethods':
+                score = 0.3;
+                score += Math.min(dangerousMethodCount * 0.12, 0.48);
+                break;
+            default:
+                score = 0.5;
+        }
+
+        return Math.max(0.1, Math.min(1.0, parseFloat(score.toFixed(2))));
+    }
+
     async execute(target) {
         const findings = [];
         const headerAnalyzer = new HeaderAnalyzer();
@@ -17,13 +70,14 @@ class ConfigAgent extends BaseAgent {
             const analysis = headerAnalyzer.analyze(response.headers);
 
             for (const missing of analysis.missing) {
+                const criticalHeaders = ['content-security-policy', 'x-frame-options', 'x-content-type-options', 'strict-transport-security'];
                 this.addFinding({
                     type: 'Missing Security Header',
                     endpoint: target,
                     parameter: missing.header,
                     description: `Missing security header: ${missing.name} (${missing.description})`,
                     evidence: `Header "${missing.header}" not present in response`,
-                    confidenceScore: 0.95,
+                    confidenceScore: this._calculateConfidence({ vulnType: 'missingHeader', headerAbsent: true, isCriticalHeader: criticalHeaders.includes(missing.header.toLowerCase()) }),
                     exploitScenario: missing.recommendation,
                     impact: `Lack of ${missing.name} protection`,
                     reproductionSteps: [
@@ -42,7 +96,7 @@ class ConfigAgent extends BaseAgent {
                     parameter: leak.header,
                     description: `Server information disclosure via ${leak.header} header`,
                     evidence: `${leak.header}: ${leak.value}`,
-                    confidenceScore: 0.9,
+                    confidenceScore: this._calculateConfidence({ vulnType: 'infoLeak', revealsTechnology: /\d+\.\d+/.test(leak.value) }),
                     exploitScenario: 'Attackers can fingerprint the server technology to find known vulnerabilities',
                     impact: 'Facilitates targeted attacks',
                     reproductionSteps: [
@@ -60,7 +114,7 @@ class ConfigAgent extends BaseAgent {
                     parameter: 'CORS',
                     description: cors.issue,
                     evidence: cors.value,
-                    confidenceScore: 0.85,
+                    confidenceScore: this._calculateConfidence({ vulnType: 'cors', isWildcardOrigin: (cors.value || '').includes('*'), reflectsArbitraryOrigin: /reflects/i.test(cors.issue) }),
                     exploitScenario: 'Attacker website can make authenticated requests to this application',
                     impact: 'Data theft, unauthorized actions',
                     reproductionSteps: [
@@ -79,7 +133,7 @@ class ConfigAgent extends BaseAgent {
                     parameter: cookie.cookie,
                     description: `Cookie "${cookie.cookie}": ${cookie.issue}`,
                     evidence: cookie.issue,
-                    confidenceScore: 0.85,
+                    confidenceScore: this._calculateConfidence({ vulnType: 'cookie', isCriticalHeader: /session|sess|sid|auth|token/i.test(cookie.cookie) }),
                     exploitScenario: 'Insecure cookie settings enable session attacks',
                     impact: 'Session hijacking, CSRF',
                     reproductionSteps: [
@@ -102,13 +156,14 @@ class ConfigAgent extends BaseAgent {
             try {
                 const response = await makeRequest(`${baseOrigin}${path}`, { retries: 1, timeout: 5000 });
                 if (response.status === 200) {
+                    const debugBody = typeof response.data === 'string' ? response.data : '';
                     this.addFinding({
                         type: 'Debug Endpoint',
                         endpoint: `${baseOrigin}${path}`,
                         parameter: 'N/A',
                         description: `Debug/admin endpoint accessible: ${path}`,
                         evidence: `HTTP 200 on ${path}`,
-                        confidenceScore: 0.75,
+                        confidenceScore: this._calculateConfidence({ vulnType: 'debug', statusIs200: true, contentLength: debugBody.length }),
                         exploitScenario: `Attacker accesses ${path} to gather internal information`,
                         impact: 'Information disclosure, potential remote code execution',
                         reproductionSteps: [
@@ -135,7 +190,7 @@ class ConfigAgent extends BaseAgent {
                     parameter: 'Access-Control-Allow-Origin',
                     description: 'CORS policy reflects arbitrary origin or uses wildcard',
                     evidence: `Access-Control-Allow-Origin: ${allowOrigin} for Origin: https://evil-attacker.com`,
-                    confidenceScore: 0.9,
+                    confidenceScore: this._calculateConfidence({ vulnType: 'cors', isWildcardOrigin: allowOrigin === '*', reflectsArbitraryOrigin: allowOrigin === 'https://evil-attacker.com' }),
                     exploitScenario: 'Any website can make cross-origin requests to this application',
                     impact: 'Data theft via cross-origin requests',
                     reproductionSteps: [
@@ -160,7 +215,7 @@ class ConfigAgent extends BaseAgent {
                     parameter: 'HTTP Methods',
                     description: `Potentially dangerous HTTP methods enabled: ${enabled.join(', ')}`,
                     evidence: `Allow: ${allow}`,
-                    confidenceScore: 0.7,
+                    confidenceScore: this._calculateConfidence({ vulnType: 'httpMethods', dangerousMethodCount: enabled.length }),
                     exploitScenario: 'Dangerous HTTP methods can be used to modify or delete resources',
                     impact: 'Unauthorized data modification',
                     reproductionSteps: [

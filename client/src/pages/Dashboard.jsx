@@ -4,10 +4,11 @@ import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 import {
   LayoutDashboard, ScanLine, ShieldAlert, Terminal, LogOut,
-  History, Target, CheckCircle2, ChevronRight,
+  History, Target, CheckCircle2, ChevronRight, ChevronDown,
   Loader2, AlertCircle, RefreshCw, FileText, ScrollText,
   Radio, Shield, Zap, Bug, Lock, Settings, Globe, Key,
-  Package, Database, Activity, Layers
+  Package, Database, Activity, Layers, Clock, Cpu, Eye,
+  AlertTriangle, Wrench, FlaskConical, Info
 } from "lucide-react";
 
 
@@ -69,11 +70,47 @@ function agentColor(agent) {
 
 /* ── Nav items ── */
 const NAV = [
-  { id: "overview", icon: <LayoutDashboard size={18} />, label: "Overview" },
-  { id: "scan",     icon: <ScanLine size={18} />,        label: "New Scan" },
-  { id: "vulnerabilities", icon: <ShieldAlert size={18} />, label: "Vulnerabilities" },
-  { id: "agents",   icon: <Terminal size={18} />,         label: "Agent Logs" },
+  { id: "overview",        icon: <LayoutDashboard size={18} />, label: "Overview" },
+  { id: "scan",            icon: <ScanLine size={18} />,        label: "New Scan" },
+  { id: "vulnerabilities", icon: <ShieldAlert size={18} />,     label: "Vulnerabilities" },
+  { id: "report",          icon: <FileText size={18} />,        label: "Full Report" },
+  { id: "agents",          icon: <Terminal size={18} />,        label: "Agent Logs" },
 ];
+
+/* ── Markdown renderer (handles fenced code blocks + bold) ── */
+function renderMarkdown(text) {
+  if (!text) return null;
+  const segments = text.split(/(```[\s\S]*?```)/g);
+  return segments.map((seg, i) => {
+    if (seg.startsWith("```")) {
+      const inner = seg.slice(3, -3);
+      const nl = inner.indexOf("\n");
+      const lang = nl !== -1 ? inner.slice(0, nl).trim() : "";
+      const code = nl !== -1 ? inner.slice(nl + 1) : inner;
+      return (
+        <pre key={i} className="rounded-lg p-3 my-2 text-xs overflow-x-auto font-mono"
+          style={{ background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          {lang && (
+            <div className="text-[#7C3AED] text-[10px] mb-1.5 font-semibold uppercase tracking-wider">{lang}</div>
+          )}
+          <code className="text-[#E2E8F0] whitespace-pre">{code}</code>
+        </pre>
+      );
+    }
+    return seg.split("\n").map((line, j) => {
+      const parts = line.split(/(\*\*[^*]+\*\*)/g);
+      return (
+        <p key={`${i}-${j}`} className="text-sm text-[#CBD5E1] leading-relaxed mb-1">
+          {parts.map((p, k) =>
+            p.startsWith("**") && p.endsWith("**")
+              ? <strong key={k} className="text-[#F9FAFB] font-semibold">{p.slice(2, -2)}</strong>
+              : <span key={k}>{p}</span>
+          )}
+        </p>
+      );
+    });
+  });
+}
 
 
 /* ── Glass styles ── */
@@ -98,6 +135,12 @@ const Dashboard = () => {
   /* ── UI state ── */
   const [tab, setTab] = useState("overview");
   const [scanView, setScanView] = useState("status"); // "status" | "logs"
+  const [expandedFindings, setExpandedFindings] = useState(new Set());
+  const [reportSort, setReportSort] = useState("severity"); // "severity" | "owasp" | "type"
+  const [filterSeverity, setFilterSeverity] = useState(new Set()); // empty = all
+  const [filterOwasp, setFilterOwasp]       = useState(new Set());
+  const [filterType, setFilterType]         = useState(new Set());
+  const [openDropdown, setOpenDropdown]     = useState(null); // "severity" | "owasp" | "type" | null
   const logsEndRef = useRef(null);
 
   /* ── Data state ── */
@@ -282,6 +325,16 @@ const Dashboard = () => {
 
   const livePhaseIdx = selectedScan ? currentPhaseIndex(selectedScan.logs) : -1;
 
+  /* ── Close filter dropdowns on outside click ── */
+  useEffect(() => {
+    if (!openDropdown) return;
+    const handler = (e) => {
+      if (!e.target.closest("[data-filter-dropdown]")) setOpenDropdown(null);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [openDropdown]);
+
   /* ── Auto-scroll logs to bottom ── */
   useEffect(() => {
     if (scanView === "logs") {
@@ -364,6 +417,7 @@ const Dashboard = () => {
               {tab === "overview" && "Security Overview"}
               {tab === "scan" && "Run New Scan"}
               {tab === "vulnerabilities" && "Vulnerabilities"}
+              {tab === "report" && "Full Security Report"}
               {tab === "agents" && "Agent Activity Logs"}
             </h1>
             <p className="text-[#94A3B8] text-sm">
@@ -873,6 +927,485 @@ const Dashboard = () => {
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ── FULL REPORT TAB ── */}
+        {tab === "report" && (
+          <div className="space-y-6">
+            {/* Scan selector */}
+            {scans.filter((s) => s.status === "completed").length > 0 && (
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-[#94A3B8]">Scan:</label>
+                <select
+                  value={selectedScan?.scanId || ""}
+                  onChange={(e) => { selectScan(e.target.value); setExpandedFindings(new Set()); setFilterSeverity(new Set()); setFilterOwasp(new Set()); setFilterType(new Set()); }}
+                  className="px-3 py-1.5 rounded-lg text-sm text-[#F9FAFB] focus:outline-none cursor-pointer"
+                  style={{ background: "#0B0F1A", border: "1px solid rgba(255,255,255,0.08)" }}
+                >
+                  {scans.filter((s) => s.status === "completed").map((s) => (
+                    <option key={s.scanId} value={s.scanId}>
+                      {s.targetUrl} — {timeAgo(s.createdAt)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {!selectedScan || selectedScan.status !== "completed" ? (
+              <div className="p-12 rounded-xl text-center" style={glass}>
+                <FileText size={48} className="mx-auto mb-4 text-[#94A3B8]/40" />
+                <p className="text-[#94A3B8]">
+                  {selectedScan?.status === "running"
+                    ? "Scan in progress — the full report will appear when complete."
+                    : "No completed scans yet. Run a scan to generate a full report."}
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* ── Scan Summary ── */}
+                <div className="rounded-xl p-6" style={glass}>
+                  <div className="flex items-center gap-2 mb-5">
+                    <FileText size={18} className="text-[#7C3AED]" />
+                    <h2 className="text-lg font-bold text-[#F9FAFB]">Scan Summary</h2>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
+                    {[
+                      { icon: <Globe size={14} />, label: "Target", value: selectedScan.summary?.target || selectedScan.targetUrl },
+                      { icon: <Info size={14} />, label: "Scan ID", value: selectedScan.summary?.scanId || selectedScan.scanId },
+                      { icon: <Clock size={14} />, label: "Start Time", value: selectedScan.summary?.startTime ? new Date(selectedScan.summary.startTime).toLocaleString() : "—" },
+                      { icon: <Clock size={14} />, label: "End Time", value: selectedScan.summary?.endTime ? new Date(selectedScan.summary.endTime).toLocaleString() : "—" },
+                      { icon: <Target size={14} />, label: "Endpoints Scanned", value: selectedScan.summary?.totalEndpoints ?? "—" },
+                      { icon: <ShieldAlert size={14} />, label: "Total Findings", value: selectedScan.summary?.totalFindings ?? selectedScan.vulnerabilityCount ?? "—" },
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-start gap-3 p-3 rounded-lg" style={glassSubtle}>
+                        <span className="text-[#7C3AED] mt-0.5 shrink-0">{item.icon}</span>
+                        <div>
+                          <div className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-0.5">{item.label}</div>
+                          <div className="text-sm text-[#F9FAFB] font-mono break-all">{String(item.value)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Agents Run */}
+                  {selectedScan.summary?.agentsRun?.length > 0 && (
+                    <div>
+                      <div className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        <Cpu size={12} /> Agents Executed
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedScan.summary.agentsRun.map((agent) => (
+                          <span key={agent}
+                            className={`px-2.5 py-1 rounded-full text-xs font-semibold border`}
+                            style={{ background: "rgba(124,58,237,0.08)", border: "1px solid rgba(124,58,237,0.2)", color: "#A78BFA" }}>
+                            {agent}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {/* Severity summary bar */}
+                  <div className="grid grid-cols-4 gap-3 mt-5">
+                    {[
+                      { label: "Critical", count: selectedScan.bySeverity?.critical || 0, color: "#F87171", bg: "rgba(248,113,113,0.08)", border: "rgba(248,113,113,0.2)" },
+                      { label: "High",     count: selectedScan.bySeverity?.high || 0,     color: "#FB923C", bg: "rgba(251,146,60,0.08)",  border: "rgba(251,146,60,0.2)" },
+                      { label: "Medium",   count: selectedScan.bySeverity?.medium || 0,   color: "#FBBF24", bg: "rgba(251,191,36,0.08)",  border: "rgba(251,191,36,0.2)" },
+                      { label: "Low",      count: selectedScan.bySeverity?.low || 0,      color: "#60A5FA", bg: "rgba(96,165,250,0.08)",   border: "rgba(96,165,250,0.2)" },
+                    ].map((s) => (
+                      <div key={s.label} className="rounded-xl p-4 text-center"
+                        style={{ background: s.bg, border: `1px solid ${s.border}` }}>
+                        <div className="text-2xl font-extrabold mb-0.5" style={{ color: s.color }}>{s.count}</div>
+                        <div className="text-xs font-medium" style={{ color: s.color + "CC" }}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Findings ── */}
+                <div>
+                  {/* Sort + Filter toolbar */}
+                  <div className="space-y-3 mb-4">
+                    {/* Row 1 — title + sort */}
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <h2 className="text-lg font-bold text-[#F9FAFB] flex items-center gap-2">
+                        <Bug size={18} className="text-[#F87171]" />
+                        Findings{" "}
+                        <span className="text-sm font-normal text-[#94A3B8]">
+                          {(filterSeverity.size || filterOwasp.size || filterType.size)
+                            ? `${selectedScan.vulnerabilities.filter((v) => {
+                                if (filterSeverity.size && !filterSeverity.has(v.severity)) return false;
+                                if (filterOwasp.size   && !filterOwasp.has(v.owaspCategory))  return false;
+                                if (filterType.size    && !filterType.has(v.type))             return false;
+                                return true;
+                              }).length} / ${selectedScan.vulnerabilities?.length || 0}`
+                            : selectedScan.vulnerabilities?.length || 0}
+                        </span>
+                      </h2>
+                      {/* Sort controls */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-[#94A3B8] shrink-0">Sort by:</span>
+                        {[
+                          { key: "severity", label: "Severity" },
+                          { key: "owasp",    label: "OWASP" },
+                          { key: "type",     label: "Type" },
+                        ].map((opt) => (
+                          <button
+                            key={opt.key}
+                            onClick={() => setReportSort(opt.key)}
+                            className="px-3 py-1.5 text-xs font-semibold rounded-lg cursor-pointer transition-all duration-150"
+                            style={
+                              reportSort === opt.key
+                                ? { background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.35)", color: "#A78BFA" }
+                                : { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", color: "#94A3B8" }
+                            }
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Row 2 — filter dropdowns */}
+                    {(() => {
+                      const vulns = selectedScan.vulnerabilities || [];
+                      const SEV_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3, Info: 4 };
+                      const uniqueSev   = [...new Set(vulns.map((v) => v.severity).filter(Boolean))].sort((a, b) => (SEV_ORDER[a] ?? 5) - (SEV_ORDER[b] ?? 5));
+                      const uniqueOwasp = [...new Set(vulns.map((v) => v.owaspCategory).filter(Boolean))].sort();
+                      const uniqueType  = [...new Set(vulns.map((v) => v.type).filter(Boolean))].sort();
+
+                      const sevColors = {
+                        Critical: "#F87171", High: "#FB923C", Medium: "#FBBF24", Low: "#60A5FA", Info: "#94A3B8",
+                      };
+
+                      const toggle = (setter, val) => {
+                        setter((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(val)) next.delete(val); else next.add(val);
+                          return next;
+                        });
+                      };
+
+                      const hasAnyFilter = filterSeverity.size || filterOwasp.size || filterType.size;
+
+                      const dropdownStyle = {
+                        background: "#111827",
+                        border: "1px solid rgba(255,255,255,0.10)",
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                      };
+
+                      const configs = [
+                        {
+                          id: "severity",
+                          label: "Severity",
+                          options: uniqueSev,
+                          active: filterSeverity,
+                          setter: setFilterSeverity,
+                          getColor: (o) => sevColors[o] || "#94A3B8",
+                          accentBorder: "rgba(248,113,113,0.35)",
+                        },
+                        {
+                          id: "owasp",
+                          label: "OWASP",
+                          options: uniqueOwasp,
+                          active: filterOwasp,
+                          setter: setFilterOwasp,
+                          getColor: () => "#A78BFA",
+                          accentBorder: "rgba(124,58,237,0.35)",
+                        },
+                        {
+                          id: "type",
+                          label: "Type",
+                          options: uniqueType,
+                          active: filterType,
+                          setter: setFilterType,
+                          getColor: () => "#60A5FA",
+                          accentBorder: "rgba(59,130,246,0.35)",
+                        },
+                      ];
+
+                      return (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-[#94A3B8] shrink-0">Filter:</span>
+                          {configs.map(({ id, label, options, active, setter, getColor, accentBorder }) => {
+                            const isOpen = openDropdown === id;
+                            const selectedCount = active.size;
+                            return (
+                              <div key={id} className="relative" data-filter-dropdown>
+                                {/* Trigger button */}
+                                <button
+                                  onClick={() => setOpenDropdown(isOpen ? null : id)}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all duration-150"
+                                  style={
+                                    selectedCount > 0
+                                      ? { background: "rgba(124,58,237,0.15)", border: `1px solid ${accentBorder}`, color: "#F9FAFB" }
+                                      : { background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "#94A3B8" }
+                                  }
+                                >
+                                  {label}
+                                  {selectedCount > 0 && (
+                                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                                      style={{ background: "rgba(124,58,237,0.3)", color: "#A78BFA" }}>
+                                      {selectedCount}
+                                    </span>
+                                  )}
+                                  <ChevronDown size={12} className={`transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`} />
+                                </button>
+
+                                {/* Dropdown panel */}
+                                {isOpen && options.length > 0 && (
+                                  <div
+                                    className="absolute left-0 top-full mt-1.5 z-50 rounded-xl overflow-hidden min-w-[180px]"
+                                    style={dropdownStyle}
+                                  >
+                                    {/* Select all / clear row */}
+                                    <div className="flex items-center justify-between px-3 py-2"
+                                      style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#475569]">{label}</span>
+                                      <button
+                                        onClick={() => setter(active.size === options.length ? new Set() : new Set(options))}
+                                        className="text-[10px] cursor-pointer transition-colors"
+                                        style={{ color: "#7C3AED" }}
+                                      >
+                                        {active.size === options.length ? "Clear" : "All"}
+                                      </button>
+                                    </div>
+                                    {/* Options */}
+                                    <div className="py-1 max-h-56 overflow-y-auto">
+                                      {options.map((opt) => {
+                                        const checked = active.has(opt);
+                                        const color = getColor(opt);
+                                        return (
+                                          <label
+                                            key={opt}
+                                            className="flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors hover:bg-white/[0.04]"
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={checked}
+                                              onChange={() => toggle(setter, opt)}
+                                              className="rounded cursor-pointer accent-[#7C3AED]"
+                                            />
+                                            <span className="text-xs font-medium" style={{ color: checked ? color : "#94A3B8" }}>
+                                              {opt}
+                                            </span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          {/* Clear all */}
+                          {hasAnyFilter && (
+                            <button
+                              onClick={() => { setFilterSeverity(new Set()); setFilterOwasp(new Set()); setFilterType(new Set()); }}
+                              className="px-2.5 py-1.5 text-xs font-semibold rounded-lg cursor-pointer transition-colors"
+                              style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#F87171" }}
+                            >
+                              ✕ Clear
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {!selectedScan.vulnerabilities?.length ? (
+                    <div className="p-8 rounded-xl text-center" style={glass}>
+                      <CheckCircle2 size={32} className="mx-auto mb-3 text-green-400" />
+                      <p className="text-[#94A3B8] text-sm">No vulnerabilities found in this scan.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {(() => {
+                        const SEV_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3, Info: 4 };
+
+                        // Apply filters first
+                        const filtered = selectedScan.vulnerabilities.filter((v) => {
+                          if (filterSeverity.size && !filterSeverity.has(v.severity)) return false;
+                          if (filterOwasp.size   && !filterOwasp.has(v.owaspCategory))  return false;
+                          if (filterType.size    && !filterType.has(v.type))             return false;
+                          return true;
+                        });
+
+                        const sorted = [...filtered].sort((a, b) => {
+                          if (reportSort === "severity") {
+                            const diff = (SEV_ORDER[a.severity] ?? 5) - (SEV_ORDER[b.severity] ?? 5);
+                            return diff !== 0 ? diff : (b.cvssScore || 0) - (a.cvssScore || 0);
+                          }
+                          if (reportSort === "owasp") {
+                            return (a.owaspCategory || "").localeCompare(b.owaspCategory || "");
+                          }
+                          if (reportSort === "type") {
+                            return (a.type || "").localeCompare(b.type || "");
+                          }
+                          return 0;
+                        });
+
+                        if (sorted.length === 0) {
+                          return (
+                            <div className="p-8 rounded-xl text-center" style={glass}>
+                              <ShieldAlert size={32} className="mx-auto mb-3 text-[#94A3B8]/40" />
+                              <p className="text-[#94A3B8] text-sm">No findings match the current filters.</p>
+                              <button
+                                onClick={() => { setFilterSeverity(new Set()); setFilterOwasp(new Set()); setFilterType(new Set()); }}
+                                className="mt-3 text-xs text-[#7C3AED] hover:text-[#A78BFA] cursor-pointer transition-colors"
+                              >
+                                Clear filters
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        // Group headers for owasp / type sorts
+                        const showGroups = reportSort === "owasp" || reportSort === "type";
+                        const getGroup = (v) =>
+                          reportSort === "owasp" ? (v.owaspCategory || "Uncategorized") : (v.type || "Unknown");
+
+                        let lastGroup = null;
+                        return sorted.map((v, idx) => {
+                          const isExpanded = expandedFindings.has(v.id);
+                          const toggleExpand = () => {
+                            setExpandedFindings((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(v.id)) next.delete(v.id);
+                              else next.add(v.id);
+                              return next;
+                            });
+                          };
+                          const group = showGroups ? getGroup(v) : null;
+                          const showGroupHeader = showGroups && group !== lastGroup;
+                          if (showGroups) lastGroup = group;
+
+                          return (
+                            <div key={v.id || idx}>
+                              {/* Group header */}
+                              {showGroupHeader && (
+                                <div className="flex items-center gap-3 mt-4 mb-2 first:mt-0">
+                                  <div className="text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full"
+                                    style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.2)", color: "#A78BFA" }}>
+                                    {group}
+                                  </div>
+                                  <div className="flex-1 h-px" style={{ background: "rgba(124,58,237,0.12)" }} />
+                                </div>
+                              )}
+
+                              <div className="rounded-xl overflow-hidden" style={glass}>
+                                {/* Finding header */}
+                                <button
+                                  onClick={toggleExpand}
+                                  className="w-full flex items-center gap-3 px-5 py-4 text-left cursor-pointer hover:bg-white/[0.03] transition-colors"
+                                >
+                                  <span className={`text-xs px-2.5 py-1 rounded-full border font-bold shrink-0 ${sevStyle(v.severity)}`}>
+                                    {v.severity}
+                                  </span>
+                                  <span className="flex-1 text-sm font-semibold text-[#F9FAFB]">{v.type}</span>
+                                  <span className="text-xs font-mono text-[#94A3B8] shrink-0 hidden sm:block truncate max-w-[200px]">{v.endpoint}</span>
+                                  <span className="text-xs text-[#94A3B8] shrink-0 hidden md:block">{v.owaspCategory || "—"}</span>
+                                  <span className="text-xs font-mono font-bold shrink-0" style={{
+                                    color: v.cvssScore >= 9 ? "#F87171" : v.cvssScore >= 7 ? "#FB923C" : v.cvssScore >= 4 ? "#FBBF24" : "#60A5FA"
+                                  }}>
+                                    CVSS {v.cvssScore}
+                                  </span>
+                                  {isExpanded
+                                    ? <ChevronDown size={16} className="text-[#94A3B8] shrink-0" />
+                                    : <ChevronRight size={16} className="text-[#94A3B8] shrink-0" />}
+                                </button>
+
+                            {/* Expanded full detail */}
+                            {isExpanded && (
+                              <div className="px-5 pb-6 space-y-5"
+                                style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+
+                                {/* Meta row */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4">
+                                  {[
+                                    { label: "ID", value: v.id },
+                                    { label: "OWASP", value: v.owaspCategory || "—" },
+                                    { label: "Parameter", value: v.parameter || "N/A" },
+                                    { label: "Confidence", value: v.confidenceScore != null ? `${Math.round(v.confidenceScore * 100)}%` : "—" },
+                                  ].map((m) => (
+                                    <div key={m.label} className="p-3 rounded-lg" style={glassSubtle}>
+                                      <div className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-0.5">{m.label}</div>
+                                      <div className="text-xs text-[#F9FAFB] font-mono break-all">{m.value}</div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* Endpoint */}
+                                <div className="p-3 rounded-lg" style={glassSubtle}>
+                                  <div className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                                    <Globe size={10} /> Endpoint
+                                  </div>
+                                  <div className="text-xs text-[#60A5FA] font-mono break-all">{v.endpoint}</div>
+                                </div>
+
+                                {/* Description */}
+                                {v.description && (
+                                  <div>
+                                    <div className="text-xs font-semibold text-[#94A3B8] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                      <Info size={12} /> Description
+                                    </div>
+                                    <p className="text-sm text-[#CBD5E1] leading-relaxed">{v.description}</p>
+                                  </div>
+                                )}
+
+                                {/* Evidence */}
+                                {v.evidence && (
+                                  <div className="p-3 rounded-lg" style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.15)" }}>
+                                    <div className="text-xs font-semibold text-[#FBBF24] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                      <Eye size={12} /> Evidence
+                                    </div>
+                                    <p className="text-sm text-[#CBD5E1] font-mono leading-relaxed">{v.evidence}</p>
+                                  </div>
+                                )}
+
+                                {/* Exploit Scenario */}
+                                {v.exploitScenario && (
+                                  <div className="p-3 rounded-lg" style={{ background: "rgba(248,113,113,0.05)", border: "1px solid rgba(248,113,113,0.15)" }}>
+                                    <div className="text-xs font-semibold text-[#F87171] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                      <FlaskConical size={12} /> Exploit Scenario
+                                    </div>
+                                    <p className="text-sm text-[#CBD5E1] leading-relaxed">{v.exploitScenario}</p>
+                                  </div>
+                                )}
+
+                                {/* Impact */}
+                                {v.impact && (
+                                  <div className="p-3 rounded-lg" style={{ background: "rgba(251,146,60,0.05)", border: "1px solid rgba(251,146,60,0.15)" }}>
+                                    <div className="text-xs font-semibold text-[#FB923C] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                      <AlertTriangle size={12} /> Impact
+                                    </div>
+                                    <p className="text-sm text-[#CBD5E1] leading-relaxed">{v.impact}</p>
+                                  </div>
+                                )}
+
+                                {/* Remediation */}
+                                {v.remediation && (
+                                  <div>
+                                    <div className="text-xs font-semibold text-[#22C55E] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                      <Wrench size={12} /> Remediation
+                                    </div>
+                                    <div className="p-4 rounded-xl" style={{ background: "rgba(34,197,94,0.04)", border: "1px solid rgba(34,197,94,0.12)" }}>
+                                      {renderMarkdown(v.remediation)}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                              </div>
+                            </div>
+                        );
+                        });
+                      })()}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         )}
