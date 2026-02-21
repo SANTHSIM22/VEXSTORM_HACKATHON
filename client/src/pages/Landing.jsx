@@ -6,7 +6,8 @@ import {
   ArrowRight, Database, Users, Lightbulb, Workflow, Rocket,
   FileCode, ShieldAlert, ShieldHalf, UsersRound, GitCommitHorizontal,
   PackageCheck, Search, Bomb, ShieldPlus, ChevronRight, ShieldCheck,
-  Sparkles, Zap, Eye
+  Sparkles, Zap, Eye, Monitor, Cpu, Lock, Globe, Server, KeyRound,
+  BrainCircuit, CheckCircle2, BarChart3, Terminal, Download, Github
 } from "lucide-react";
 
 
@@ -106,6 +107,7 @@ const Landing = () => {
   const [statsRef, statsInView] = useInView();
   const [featRef, featInView] = useInView();
   const [howRef, howInView] = useInView();
+  const [extRef, extInView] = useInView();
   const [ctaRef, ctaInView] = useInView();
 
   /* ── Particle network ── */
@@ -209,7 +211,9 @@ const Landing = () => {
         .marquee-track{
           display:flex;
           width:max-content;
+          padding:20px;
           animation:marquee 32s linear infinite;
+ 
         }
         .marquee-track:hover{animation-play-state:paused}
         .marquee-wrap{overflow:hidden;-webkit-mask:linear-gradient(90deg,transparent,black 8%,black 92%,transparent);mask:linear-gradient(90deg,transparent,black 8%,black 92%,transparent);}
@@ -245,6 +249,14 @@ const Landing = () => {
           transition:all 0.4s cubic-bezier(0.16,1,0.3,1);
           z-index:50;
           pointer-events:none;
+        }
+        .node-tooltip-bottom{
+          bottom:auto !important;
+          top:calc(100% + 20px);
+          transform:translateX(-50%) translateY(-10px);
+        }
+        .agent-node:hover .node-tooltip-bottom{
+          transform:translateX(-50%) translateY(0);
         }
         .node-ring{transition:all 0.4s cubic-bezier(0.16,1,0.3,1);opacity:0.5}
 
@@ -396,9 +408,9 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2.5 group">
             <div className="transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12">
-              <img src="/logo.png" width={24} height={24} alt="Zero Trace" className="object-contain" />
+              <img src="/logo.png" width={36} height={36} alt="Zero Trace" className="object-contain" />
             </div>
-            <span className="brand-name text-xs text-[#F9FAFB]">
+            <span className="brand-name text-sm text-[#F9FAFB]">
               ZERO<span className="bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent">TRACE</span>
             </span>
           </Link>
@@ -655,7 +667,7 @@ const Landing = () => {
 
       {/* ══════════════════ FEATURES ══════════════════ */}
       <section ref={featRef} className="relative z-10 py-28">
-        <div className={`text-center mb-20 px-6 fade-up ${featInView ? "visible" : ""}`}>
+        <div className={`text-center  mx-12 px-6 fade-up ${featInView ? "visible" : ""}`}>
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5 text-[10px] font-semibold tracking-[0.2em] text-[#CBD5E1] uppercase" style={glass}>
             <Lightbulb size={12} className="text-[#7C3AED]" /> Capabilities
           </div>
@@ -675,8 +687,10 @@ const Landing = () => {
             {[...FEATURES, ...FEATURES].map((f, i) => (
               <div
                 key={i}
-                className="glass-card flex-shrink-0 w-72 mx-3 rounded-2xl overflow-hidden cursor-default"
+                className="glass-card flex-shrink-0 w-72 mx-3 rounded-2xl overflow-hidden cursor-default transition-all duration-300"
                 style={{ border: "1px solid rgba(255,255,255,0.07)" }}
+                onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 0 20px rgba(124,58,237,0.25), 0 8px 32px rgba(0,0,0,0.2)"}
+                onMouseLeave={(e) => e.currentTarget.style.boxShadow = "none"}
               >
                 {/* Icon banner */}
                 <div
@@ -710,190 +724,366 @@ const Landing = () => {
       </div>
 
       {/* ══════════════════ HOW IT WORKS ══════════════════ */}
-      <section ref={howRef} className="relative z-10 py-28 px-6 overflow-hidden">
-        <div className={`max-w-5xl mx-auto text-center mb-16 fade-up ${howInView ? "visible" : ""}`}>
+      <section ref={howRef} className="relative z-10 py-28 px-6 ">
+        <div className={`max-w-6xl mx-auto text-center mb-16 fade-up ${howInView ? "visible" : ""}`}>
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5 text-[10px] font-semibold tracking-[0.2em] text-[#CBD5E1] uppercase" style={glass}>
             <Workflow size={12} className="text-[#3B82F6]" /> How It Works
           </div>
           <h2 className="text-4xl md:text-5xl font-extrabold text-[#F9FAFB] leading-tight">
-            Three Agents.{" "}
-            <span className="bg-gradient-to-r from-[#7C3AED] via-[#6366F1] to-[#3B82F6] bg-clip-text text-transparent">One Mission.</span>
+            10 Agents.{" "}
+            <span className="bg-gradient-to-r from-[#7C3AED] via-[#6366F1] to-[#3B82F6] bg-clip-text text-transparent">One Misson.</span>
           </h2>
+          <p className="text-[#94A3B8] max-w-lg mx-auto text-base leading-relaxed mt-4">
+            Hover over each node to discover what every agent does in the security pipeline.
+          </p>
         </div>
 
-        {/* Network Mesh Visualization */}
-        <div className="max-w-5xl mx-auto relative" style={{ height: "500px" }}>
-          {/* SVG Mesh Background */}
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            viewBox="0 0 1000 500"
-            preserveAspectRatio="none"
-          >
-            <defs>
-              <linearGradient id="lineGradient1" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#7C3AED" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="#6366F1" stopOpacity="0.8" />
-              </linearGradient>
-              <linearGradient id="lineGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#6366F1" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="#3B82F6" stopOpacity="0.8" />
-              </linearGradient>
-              <linearGradient id="lineGradient3" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#3B82F6" stopOpacity="0.8" />
-                <stop offset="100%" stopColor="#10B981" stopOpacity="0.8" />
-              </linearGradient>
-              <linearGradient id="lineGradientArc" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#7C3AED" stopOpacity="0.5" />
-                <stop offset="50%" stopColor="#6366F1" stopOpacity="0.5" />
-                <stop offset="100%" stopColor="#10B981" stopOpacity="0.5" />
-              </linearGradient>
-              <filter id="glow">
-                <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-                <feMerge>
-                  <feMergeNode in="coloredBlur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
+        {/* Network Mesh — 10 agents around central orchestrator */}
+        {(() => {
+          const AGENTS = [
+            { icon: <FileCode size={18} />,    title: "FILE SCAN",    color: "#7C3AED", desc: "Discovers & indexes all relevant source files in the workspace for the pipeline." },
+            { icon: <Search size={18} />,       title: "PATTERN",      color: "#6366F1", desc: "Regex-based detection of hardcoded secrets, unsafe functions, SQLi, XSS & CMDi." },
+            { icon: <Lock size={18} />,          title: "AUTH",         color: "#3B82F6", desc: "JWT misuse, missing auth guards, session management flaws & RBAC bypass detection." },
+            { icon: <ShieldAlert size={18} />,   title: "BIZ LOGIC",   color: "#8B5CF6", desc: "IDOR, privilege escalation, mass assignment & insecure direct object references." },
+            { icon: <Globe size={18} />,         title: "API SEC",     color: "#0EA5E9", desc: "Unprotected endpoints, GraphQL introspection & broken object-level authorization." },
+            { icon: <Monitor size={18} />,      title: "FRONTEND",    color: "#06B6D4", desc: "Missing CSP headers, unsafe HTML sinks, open redirects & client-side XSS vectors." },
+            { icon: <Server size={18} />,        title: "INFRA",       color: "#10B981", desc: "Exposed env files, insecure Docker & CI configs, missing .gitignore rules." },
+            { icon: <KeyRound size={18} />,      title: "CRYPTO",      color: "#F59E0B", desc: "Weak algorithms (MD5, SHA1), missing audit trails & sensitive data in logs." },
+            { icon: <BrainCircuit size={18} />,  title: "AI DEEP",     color: "#EC4899", desc: "Mistral-powered contextual reasoning for complex & chained vulnerabilities." },
+            { icon: <CheckCircle2 size={18} />,  title: "VERIFY",      color: "#14B8A6", desc: "Deduplication, false-positive filtering & final severity scoring." },
+          ];
 
-            {/* Connection lines: node centers at x=160(16%), x=500(50%), x=840(84%) all at y=250(50%) */}
-            <g filter="url(#glow)">
-              <path className="mesh-line" d="M 160 250 Q 330 160 500 250" fill="none" stroke="url(#lineGradient1)" strokeWidth="2" />
-              <path className="mesh-line" d="M 500 250 Q 670 160 840 250" fill="none" stroke="url(#lineGradient2)" strokeWidth="2" style={{ animationDelay: "0.5s" }} />
-              <path className="mesh-line" d="M 160 250 Q 500 430 840 250" fill="none" stroke="url(#lineGradientArc)" strokeWidth="1.5" style={{ animationDelay: "1s" }} />
-            </g>
+          // Hand-placed positions for a natural scattered graph layout
+          // Orchestrator at center, agents spread across the full span
+          const cx = 48;
+          const cy = 45;
 
-            {/* Floating data particles */}
-            <g>
-              <circle r="5" fill="#7C3AED" filter="url(#glow)">
-                <animateMotion dur="2.5s" repeatCount="indefinite" path="M 160 250 Q 330 160 500 250" />
-              </circle>
-              <circle r="5" fill="#3B82F6" filter="url(#glow)">
-                <animateMotion dur="2.5s" repeatCount="indefinite" path="M 500 250 Q 670 160 840 250" begin="0.8s" />
-              </circle>
-              <circle r="4" fill="#10B981" filter="url(#glow)">
-                <animateMotion dur="4s" repeatCount="indefinite" path="M 160 250 Q 500 430 840 250" begin="0.3s" />
-              </circle>
-            </g>
+          // Manually positioned to fill the space like a network graph
+          const positions = [
+            { x: 8,  y: 22 },  // FILE SCAN — top-left
+            { x: 88, y: 18 },  // PATTERN — top-right
+            { x: 25, y: 48 },  // AUTH — mid-left
+            { x: 82, y: 72 },  // BIZ LOGIC — bottom-right
+            { x: 62, y: 22 },  // API SEC — top-center-right
+            { x: 32, y: 76 },  // FRONTEND — bottom-left
+            { x: 90, y: 45 },  // INFRA — mid-right
+            { x: 55, y: 67 },  // CRYPTO — center-bottom
+            { x: 28, y: 13 },  // AI DEEP — upper-left area
+            { x: 68, y: 48 },  // VERIFY — right
+          ];
 
-            {/* Scattered secondary nodes */}
-            <g opacity="0.5">
-              <circle cx="300" cy="130" r="4" fill="#7C3AED" className="mesh-node" style={{ animationDelay: "0.3s" }} />
-              <circle cx="700" cy="130" r="4" fill="#3B82F6" className="mesh-node" style={{ animationDelay: "0.6s" }} />
-              <circle cx="350" cy="370" r="3" fill="#6366F1" className="mesh-node" style={{ animationDelay: "0.9s" }} />
-              <circle cx="650" cy="370" r="3" fill="#6366F1" className="mesh-node" style={{ animationDelay: "1.2s" }} />
-              <circle cx="280" cy="200" r="3" fill="#7C3AED" className="mesh-node" style={{ animationDelay: "1.5s" }} />
-              <circle cx="720" cy="200" r="3" fill="#3B82F6" className="mesh-node" style={{ animationDelay: "1.8s" }} />
-              <circle cx="500" cy="380" r="3" fill="#10B981" className="mesh-node" style={{ animationDelay: "2.1s" }} />
-            </g>
-          </svg>
+          return (
+            <div className="max-w-6xl mx-auto relative " style={{ height: "550px" }}>
+              {/* SVG connection lines from each agent to center */}
+              <svg
+                className="absolute inset-0 w-full h-full pointer-events-none"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+              >
+                <defs>
+                  <filter id="meshGlow">
+                    <feGaussianBlur stdDeviation="0.3" result="coloredBlur" />
+                    <feMerge>
+                      <feMergeNode in="coloredBlur" />
+                      <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                  </filter>
+                </defs>
+                {/* Lines from each agent to center */}
+                {positions.map((pos, i) => (
+                  <line
+                    key={`line-${i}`}
+                    className="mesh-line"
+                    x1={pos.x}
+                    y1={pos.y}
+                    x2={cx}
+                    y2={cy}
+                    stroke={AGENTS[i].color}
+                    strokeWidth="0.15"
+                    strokeOpacity="0.5"
+                    filter="url(#meshGlow)"
+                    style={{ animationDelay: `${i * 0.2}s` }}
+                  />
+                ))}
+                {/* Cross-connections between nearby agents for mesh look */}
+                {positions.map((pos, i) =>
+                  positions.map((other, j) => {
+                    if (j <= i) return null;
+                    const dx = pos.x - other.x;
+                    const dy = pos.y - other.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist > 45) return null; // only connect nearby nodes
+                    return (
+                      <line
+                        key={`mesh-${i}-${j}`}
+                        x1={pos.x}
+                        y1={pos.y}
+                        x2={other.x}
+                        y2={other.y}
+                        stroke={AGENTS[i].color}
+                        strokeWidth="0.1"
+                        strokeOpacity={0.15 + (1 - dist / 45) * 0.15}
+                      />
+                    );
+                  })
+                )}
+                {/* Data particles flowing to center */}
+                {positions.map((pos, i) => (
+                  <circle key={`p-${i}`} r="0.5" fill={AGENTS[i].color} filter="url(#meshGlow)">
+                    <animateMotion
+                      dur={`${2 + (i % 3)}s`}
+                      repeatCount="indefinite"
+                      path={`M ${pos.x} ${pos.y} L ${cx} ${cy}`}
+                      begin={`${i * 0.3}s`}
+                    />
+                  </circle>
+                ))}
+              </svg>
 
-          {/* Interactive Agent Nodes — use margin offset instead of transform so fade-up works */}
-          {[
-            { id: 1, icon: <Eye size={24} />, title: "ANALYST", color: "#7C3AED", left: "16%",
-              desc: "Reads every file. Builds a semantic map. Identifies suspicious patterns, data flows, and trust boundaries across your entire codebase." },
-            { id: 2, icon: <Zap size={24} />, title: "ATTACKER", color: "#3B82F6", left: "50%",
-              desc: "Attempts to exploit each flaw. Generates PoC scripts. Rates severity using CVSS scoring. Thinks like a real adversary." },
-            { id: 3, icon: <ShieldPlus size={24} />, title: "PATCHER", color: "#10B981", left: "84%",
-              desc: "Writes context-aware fixes. Validates patches against edge cases. Produces a comprehensive audit report with full remediation." },
-          ].map((agent, i) => (
-            <div
-              key={agent.id}
-              className="absolute"
-              style={{
-                left: agent.left,
-                top: "50%",
-                marginLeft: "-44px",
-                marginTop: "-44px",
-              }}
-            >
+              {/* Central Orchestrator Node */}
               <div
-                className={`agent-node fade-up ${howInView ? "visible" : ""}`}
+                className="absolute z-20"
                 style={{
-                  transitionDelay: `${i * 0.2 + 0.3}s`,
-                  "--node-color": `${agent.color}40`,
+                  left: `${cx}%`,
+                  top: `${cy}%`,
+                  marginLeft: "-48px",
+                  marginTop: "-48px",
                 }}
               >
-                {/* Tooltip */}
-                <div
-                  className="node-tooltip"
-                  style={{
-                    background: "rgba(11,15,26,0.95)",
-                    backdropFilter: "blur(20px)",
-                    border: `1px solid ${agent.color}40`,
-                    boxShadow: `0 20px 50px rgba(0,0,0,0.5), 0 0 30px ${agent.color}20`,
-                  }}
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <div
-                      className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                      style={{ background: `${agent.color}20`, color: agent.color }}
-                    >
-                      {agent.icon}
-                    </div>
-                    <h4 className="font-bold text-sm tracking-wide" style={{ color: agent.color }}>
-                      {agent.title} Agent
-                    </h4>
-                  </div>
-                  <p className="text-[13px] text-[#94A3B8] leading-relaxed">{agent.desc}</p>
-                  {/* Arrow */}
+                <div className={`agent-node fade-up ${howInView ? "visible" : ""}`}
+                  style={{ "--node-color": "rgba(99,102,241,0.4)" }}>
+                  {/* Tooltip */}
                   <div
-                    className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45"
-                    style={{ background: "rgba(11,15,26,0.95)", borderRight: `1px solid ${agent.color}40`, borderBottom: `1px solid ${agent.color}40` }}
-                  />
-                </div>
-
-                {/* Outer ring */}
-                <div
-                  className="node-ring absolute rounded-full"
-                  style={{
-                    width: "110px",
-                    height: "110px",
-                    left: "50%",
-                    top: "50%",
-                    transform: "translate(-50%, -50%)",
-                    border: `1px solid ${agent.color}30`,
-                    background: `radial-gradient(circle, ${agent.color}08 0%, transparent 70%)`,
-                  }}
-                />
-
-                {/* Node core */}
-                <div
-                  className="node-core relative w-[88px] h-[88px] rounded-full flex flex-col items-center justify-center"
-                  style={{
-                    background: "rgba(22, 27, 49,0.9)",
-                    backdropFilter: "blur(50px)",
-                    WebkitBackdropFilter: "blur(50px)",
-                    border: `2px solid ${agent.color}`,
-                    boxShadow: `0 0 20px ${agent.color}40, 0 0 40px ${agent.color}15, inset 0 1px 0 rgba(255,255,255,0.05)`,
-                    "--node-color": `${agent.color}40`,
-                  }}
-                >
-                  <div style={{ color: agent.color }}>{agent.icon}</div>
-                  <span className="text-[9px] font-bold mt-1 tracking-wider" style={{ color: agent.color }}>
-                    {agent.title}
-                  </span>
+                    className="node-tooltip"
+                    style={{
+                      background: "rgba(11,15,26,0.95)",
+                      backdropFilter: "blur(20px)",
+                      border: "1px solid rgba(99,102,241,0.4)",
+                      boxShadow: "0 20px 50px rgba(0,0,0,0.5), 0 0 30px rgba(99,102,241,0.2)",
+                    }}
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                        style={{ background: "rgba(99,102,241,0.2)", color: "#6366F1" }}>
+                        <Cpu size={20} />
+                      </div>
+                      <h4 className="font-bold text-sm tracking-wide text-[#6366F1]">ORCHESTRATOR</h4>
+                    </div>
+                    <p className="text-[13px] text-[#94A3B8] leading-relaxed">
+                      Powered by LangGraph — coordinates all 10 agents, manages the execution pipeline, aggregates results, and produces the final security report.
+                    </p>
+                    <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-4 h-4 rotate-45"
+                      style={{ background: "rgba(11,15,26,0.95)", borderRight: "1px solid rgba(99,102,241,0.4)", borderBottom: "1px solid rgba(99,102,241,0.4)" }} />
+                  </div>
+                  {/* Ring */}
+                  <div className="node-ring absolute rounded-full orbit-ring"
+                    style={{
+                      width: "120px", height: "120px",
+                      left: "50%", top: "50%", transform: "translate(-50%, -50%)",
+                      border: "1px solid rgba(99,102,241,0.3)",
+                      background: "radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 70%)",
+                    }} />
+                  {/* Core */}
+                  <div className="node-core relative w-24 h-24 rounded-full flex flex-col items-center justify-center"
+                    style={{
+                      background: "rgba(22,27,49,0.95)",
+                      backdropFilter: "blur(50px)",
+                      border: "2px solid #6366F1",
+                      boxShadow: "0 0 30px rgba(99,102,241,0.4), 0 0 60px rgba(99,102,241,0.15), inset 0 1px 0 rgba(255,255,255,0.05)",
+                      "--node-color": "rgba(99,102,241,0.4)",
+                    }}>
+                    <Cpu size={22} className="text-[#6366F1]" />
+                    <span className="text-[8px] font-bold mt-1 tracking-wider text-[#6366F1]">ORCHESTRATOR</span>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
 
-          {/* Bottom status */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10">
-            <div
-              className="px-6 py-3 rounded-full flex items-center gap-3"
-              style={{
-                background: "rgba(99,102,241,0.1)",
-                border: "1px solid rgba(99,102,241,0.2)",
-              }}
-            >
-              <div className="w-2 h-2 rounded-full bg-[#7C3AED] animate-pulse" />
-              <span className="text-xs text-[#94A3B8] font-medium tracking-wide">HOVER NODES TO EXPLORE</span>
-              <div className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" style={{ animationDelay: "0.5s" }} />
+              {/* 10 Agent Nodes around the circle */}
+              {AGENTS.map((agent, i) => {
+                const pos = positions[i];
+                const isBottom = pos.y > cy;
+                // Smaller nodes
+                const nodeSize = 70;
+                const halfNode = nodeSize / 2;
+                return (
+                  <div
+                    key={i}
+                    className="absolute z-10"
+                    style={{
+                      left: `${pos.x}%`,
+                      top: `${pos.y}%`,
+                      marginLeft: `-${halfNode}px`,
+                      marginTop: `-${halfNode}px`,
+                    }}
+                  >
+                    <div
+                      className={`agent-node fade-up ${howInView ? "visible" : ""}`}
+                      style={{
+                        transitionDelay: `${i * 0.08 + 0.2}s`,
+                        "--node-color": `${agent.color}40`,
+                      }}
+                    >
+                      {/* Tooltip */}
+                      <div
+                        className={`node-tooltip${isBottom ? " node-tooltip-bottom" : ""}`}
+                        style={{
+                          background: "rgba(11,15,26,0.95)",
+                          backdropFilter: "blur(20px)",
+                          border: `1px solid ${agent.color}40`,
+                          boxShadow: `0 20px 50px rgba(0,0,0,0.5), 0 0 30px ${agent.color}20`,
+                          width: "240px",
+                        }}
+                      >
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                            style={{ background: `${agent.color}20`, color: agent.color }}>
+                            {agent.icon}
+                          </div>
+                          <h4 className="font-bold text-xs tracking-wide" style={{ color: agent.color }}>
+                            {agent.title}
+                          </h4>
+                        </div>
+                        <p className="text-[12px] text-[#94A3B8] leading-relaxed">{agent.desc}</p>
+                        {isBottom ? (
+                          <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45"
+                            style={{ background: "rgba(11,15,26,0.95)", borderLeft: `1px solid ${agent.color}40`, borderTop: `1px solid ${agent.color}40` }} />
+                        ) : (
+                          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-3 h-3 rotate-45"
+                            style={{ background: "rgba(11,15,26,0.95)", borderRight: `1px solid ${agent.color}40`, borderBottom: `1px solid ${agent.color}40` }} />
+                        )}
+                      </div>
+
+                      {/* Ring */}
+                      <div className="node-ring absolute rounded-full"
+                        style={{
+                          width: `${nodeSize + 16}px`, height: `${nodeSize + 16}px`,
+                          left: "50%", top: "50%", transform: "translate(-50%, -50%)",
+                          border: `1px solid ${agent.color}25`,
+                          background: `radial-gradient(circle, ${agent.color}06 0%, transparent 70%)`,
+                        }} />
+
+                      {/* Core */}
+                      <div
+                        className="node-core relative rounded-full flex flex-col items-center justify-center"
+                        style={{
+                          width: `${nodeSize}px`, height: `${nodeSize}px`,
+                          background: "rgba(22,27,49,0.9)",
+                          backdropFilter: "blur(50px)",
+                          border: `2px solid ${agent.color}`,
+                          boxShadow: `0 0 15px ${agent.color}30, 0 0 30px ${agent.color}10, inset 0 1px 0 rgba(255,255,255,0.05)`,
+                          "--node-color": `${agent.color}40`,
+                        }}
+                      >
+                        <div style={{ color: agent.color }}>{agent.icon}</div>
+                        <span className="text-[7px] font-bold mt-1 tracking-wider" style={{ color: agent.color }}>
+                          {agent.title}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+          
+            </div>
+          );
+        })()}
+      </section>
+
+      {/* ══════════════════ VS CODE EXTENSION ══════════════════ */}
+      <section ref={extRef} className="relative z-10 pt -10 pb-28 px-6">
+        <div className={`max-w-6xl mx-auto fade-up ${extInView ? "visible" : ""}`}>
+          {/* Header */}
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5 text-[10px] font-semibold tracking-[0.2em] text-[#CBD5E1] uppercase" style={glass}>
+              <Monitor size={12} className="text-[#7C3AED]" /> VS Code Extension
+            </div>
+            <h2 className="text-4xl md:text-5xl font-extrabold text-[#F9FAFB] leading-tight mb-5">
+              Security Scanning{" "}
+              <span className="bg-gradient-to-r from-[#7C3AED] via-[#6366F1] to-[#3B82F6] bg-clip-text text-transparent">Inside Your Editor</span>
+            </h2>
+            <p className="text-[#94A3B8] max-w-2xl mx-auto text-base leading-relaxed">
+              ZeroTrace deploys 10 specialized AI agents directly in VS Code — powered by Mistral AI and LangGraph.Scan your entire codebase in seconds. Get AI-powered insights with proof-of-exploitation payloads and remediation code.</p>
+          </div>
+
+          {/* Interactive Report Features as Separate Cards */}
+          <div className="mb-16">
+            <h3 className="text-lg font-bold text-[#F9FAFB] mb-8 flex items-center gap-2">
+              <BarChart3 size={18} className="text-[#3B82F6]" /> Interactive Report Features
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[
+                { title: "Risk Dashboard", desc: "Risk score dashboard with CRITICAL / HIGH / MEDIUM / LOW breakdown" },
+                { title: "Findings Table", desc: "Filterable findings table with expandable rows" },
+                { title: "Exploitation PoC", desc: "Proof-of-exploitation payloads & remediation code examples" },
+                { title: "OWASP Mapping", desc: "OWASP Top 10 mapping & CWE classification" },
+                { title: "Attack Chains", desc: "Attack chain explorer for chained vulnerabilities" },
+                { title: "Pipeline Logs", desc: "Full agent pipeline execution log" },
+              ].map((item, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl p-6 transition-all duration-300 hover:scale-105"
+                  style={{ 
+                    ...glass,
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+                    border: "1px solid rgba(99,102,241,0.3)"
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 0 25px rgba(99,102,241,0.3), 0 8px 24px rgba(0,0,0,0.15)"}
+                  onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 8px 32px rgba(0,0,0,0.2)"}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="shrink-0">
+                      <CheckCircle2 size={24} className="text-[#10B981]" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-[#F9FAFB] mb-2">{item.title}</h4>
+                      <p className="text-sm text-[#CBD5E1] leading-relaxed">{item.desc}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
+
+          {/* CTA Button */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-12">
+            <a
+              href="https://marketplace.visualstudio.com/items?itemName=santhsim.zerotrace"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-8 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 group"
+              style={{
+                background: "linear-gradient(135deg, #7C3AED 0%, #6366F1 100%)",
+                color: "#F9FAFB",
+                boxShadow: "0 8px 24px rgba(124,58,237,0.4)",
+              }}
+            >
+              <Download size={16} />
+              Get ZeroTrace on VS Code Marketplace
+            </a>
+            <a
+              href="#"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-7 py-3 rounded-xl font-semibold text-sm transition-all duration-300 border"
+              style={{
+                borderColor: "rgba(124,58,237,0.4)",
+                color: "#CBD5E1",
+                background: "rgba(124,58,237,0.05)",
+              }}
+            >
+              <Github size={16} className="inline mr-2" />
+              View on GitHub
+            </a>
+          </div>
+
         </div>
       </section>
+
+      {/* ── Glow divider ── */}
+      <div className="relative z-10 max-w-4xl mx-auto px-6">
+        <div className="glow-line" />
+      </div>
 
       {/* ══════════════════ CTA ══════════════════ */}
       <section ref={ctaRef} className={`relative z-10 py-36 px-6 text-center overflow-hidden scale-in ${ctaInView ? "visible" : ""}`}>
@@ -951,9 +1141,9 @@ const Landing = () => {
         <div className="py-10 px-6 flex flex-col md:flex-row items-center justify-between gap-4 max-w-7xl mx-auto">
           <Link to="/" className="flex items-center gap-2.5 group">
             <div className="transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12">
-              <img src="/logo.png" width={20} height={20} alt="Zero Trace" className="object-contain" />
+              <img src="/logo.png" width={32} height={32} alt="Zero Trace" className="object-contain" />
             </div>
-            <span className="brand-name text-xs text-[#F9FAFB]">
+            <span className="brand-name text-sm text-[#F9FAFB]">
               ZERO<span className="bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent">TRACE</span>
             </span>
           </Link>

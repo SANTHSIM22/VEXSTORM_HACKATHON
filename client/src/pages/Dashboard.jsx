@@ -79,8 +79,8 @@ const Dashboard = () => {
         style={{ background: "#111827", borderRight: "1px solid rgba(255,255,255,0.06)" }}
       >
         <div className="flex items-center gap-2.5 mb-10 px-2">
-          <img src="/logo.png" width={24} height={24} alt="Zero Trace" className="object-contain" />
-          <span className="brand-name text-xs text-[#F9FAFB]">
+          <img src="/logo.png" width={32} height={32} alt="Zero Trace" className="object-contain" />
+          <span className="brand-name text-sm text-[#F9FAFB]">
             ZERO<span className="bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent">TRACE</span>
           </span>
         </div>

@@ -54,8 +54,8 @@ const Login = () => {
 
         <div className="relative">
           <Link to="/" className="flex items-center gap-2.5 text-white no-underline mb-16">
-            <img src="/logo.png" width={28} height={28} alt="Zero Trace" className="object-contain" />
-            <span className="brand-name text-xs text-[#F9FAFB]">
+            <img src="/logo.png" width={40} height={40} alt="Zero Trace" className="object-contain" />
+            <span className="brand-name text-sm text-[#F9FAFB]">
               ZERO<span className="bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent">TRACE</span>
             </span>
           </Link>
@@ -102,8 +102,8 @@ const Login = () => {
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md">
           <Link to="/" className="flex lg:hidden items-center gap-2.5 text-white no-underline mb-10 justify-center">
-            <img src="/logo.png" width={24} height={24} alt="Zero Trace" className="object-contain" />
-            <span className="brand-name text-xs text-[#F9FAFB]">
+            <img src="/logo.png" width={32} height={32} alt="Zero Trace" className="object-contain" />
+            <span className="brand-name text-sm text-[#F9FAFB]">
               ZERO<span className="bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent">TRACE</span>
             </span>
           </Link>
