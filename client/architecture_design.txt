@@ -1,0 +1,80 @@
+# VulnSight-AI Client System Architecture Design
+
+## 1. Overview
+The client is a modern Single Page Application (SPA) built with React and Vite. It serves as the user interface for the VulnSight-AI system, providing authentication, scan management, and real-time vulnerability reporting dashboards.
+
+## 2. Tech Stack
+- **Framework:** React 19
+- **Build Tool:** Vite 7
+- **Routing:** React Router DOM v7
+- **State Management:** React Context API (AuthContext)
+- **HTTP Client:** Axios (with interceptors)
+- **Styling:** Tailwind CSS v4, Custom CSS (Glassmorphism effects)
+- **Icons:** Lucide React
+
+## 3. Component Architecture
+
+### 3.1 Entry Point & Configuration
+- **Entry:** `src/main.jsx` initializes the React DOM root.
+- **Configuration:** `vite.config.js` manages the build process and plugins.
+- **Root Component:** `src/App.jsx` handles the global layout, routing definitions, and wraps the app in the `AuthProvider`.
+
+### 3.2 Authentication & State Management
+- **AuthContext (`src/context/AuthContext.jsx`):**
+  - Manages global user state (`user`, `loading`).
+  - Handles Login, Registration, and Logout logic.
+  - Persists session via JWT tokens in `localStorage` (`vexstorm_token`, `vexstorm_user`).
+  - Validates sessions on startup via `/auth/me` endpoint.
+
+### 3.3 Networking Layer
+- **API Utilities (`src/api/axios.js`):**
+  - **Base URL:** Configured to point to the backend API (`http://localhost:5000/api`).
+  - **Request Interceptor:** Automatically attaches the Authorization Bearer token to requests.
+  - **Response Interceptor:** Global error handling (e.g., auto-logout on 401 Unauthorized responses).
+
+### 3.4 Routing & Navigation
+- **Router:** `BrowserRouter` manages client-side navigation.
+- **Route Guards (`src/components/ProtectedRoute.jsx`):**
+  - Prevents unauthenticated access to sensitive routes (like `/dashboard`).
+  - Redirects unauthorized users to `/login`.
+  - Displays a loading state while authentication is being verified.
+
+### 3.5 UI Organization
+- **Pages (`src/pages/`):**
+  - `Landing.jsx`: Public-facing marketing/welcome page.
+  - `Login.jsx` & `Signup.jsx`: Forms for user authentication.
+  - `Dashboard.jsx`: The core application interface. Displays scan history, real-time logs, and vulnerability details. (Currently utilizes mock data for demonstration).
+- **Components (`src/components/`):**
+  - `Navbar.jsx`: Responsive top navigation bar with user profile and logout controls.
+  - Includes shared UI elements like loaders and layout wrappers.
+
+## 4. Data Flow
+1. **User Action:** User logs in via `Login.jsx`.
+2. **Auth Flow:** `AuthContext` calls `api.post('/auth/login')`. Token is saved to LocalStorage.
+3. **State Update:** App state updates to authenticated; user is redirected to `/dashboard`.
+4. **Data Fetching:**
+   - Components (like Dashboard) request data via the protected Axios instance.
+   - Requests include the JWT token.
+   - (Note: Dashboard currently simulates data fetching with local constants for Scans/Logs).
+5. **Rendering:** React components re-render based on state changes (e.g., switching Dashboard tabs from "Overview" to "New Scan").
+
+## 5. File Structure (Client Folder)
+- package.json
+- vite.config.js
+- src/
+  - main.jsx (Bootstrapper)
+  - App.jsx (Router & Provider Setup)
+  - api/
+    - axios.js (HTTP Client Config)
+  - context/
+    - AuthContext.jsx (Global State)
+  - pages/
+    - Landing.jsx
+    - Login.jsx
+    - Signup.jsx
+    - Dashboard.jsx
+  - components/
+    - Navbar.jsx
+    - ProtectedRoute.jsx
+  - assets/ (Static images/icons)
+  - index.css (Global styles & Tailwind directives)

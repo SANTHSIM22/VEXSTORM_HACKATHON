@@ -1,6 +1,8 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useState } from 'react';
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { useState } from "react";
+import { LogOut, ArrowRight, Menu, X } from "lucide-react";
+
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -9,74 +11,96 @@ const Navbar = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate("/");
   };
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4 bg-[#0d1117]/80 backdrop-blur-md border-b border-[#1f2937]">
+    <nav
+      className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4"
+      style={{
+        background: "rgba(11,15,26,0.8)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+      }}
+    >
       {/* Brand */}
-      <Link to="/" className="flex items-center gap-2 text-white no-underline">
-        <span className="text-[#00ffaa] text-xl">⬡</span>
-        <span className="text-lg font-bold tracking-widest">
-          VEX<span className="text-[#00ffaa]">STORM</span>
+      <Link to="/" className="flex items-center gap-2.5 text-white no-underline">
+        <img src="/logo.png" width={24} height={24} alt="Zero Trace" className="object-contain" />
+        <span className="brand-name text-xs text-[#F9FAFB]">
+          ZERO<span className="bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent">TRACE</span>
         </span>
       </Link>
 
       {/* Desktop links */}
       <div className="hidden md:flex items-center gap-6">
-        <Link to="/" className="text-sm text-gray-400 hover:text-[#00ffaa] transition-colors duration-200">Home</Link>
+        <Link to="/" className="text-sm text-[#94A3B8] hover:text-[#F9FAFB] transition-colors duration-200">Home</Link>
         {user ? (
           <>
-            <Link to="/dashboard" className="text-sm text-gray-400 hover:text-[#00ffaa] transition-colors duration-200">Dashboard</Link>
+            <Link to="/dashboard" className="text-sm text-[#94A3B8] hover:text-[#F9FAFB] transition-colors duration-200">Dashboard</Link>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-[#00ffaa22] border border-[#00ffaa44] flex items-center justify-center text-[#00ffaa] font-bold text-sm">
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm text-[#F9FAFB]"
+                style={{ background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.3)" }}
+              >
                 {user.name?.charAt(0).toUpperCase()}
               </div>
-              <span className="text-sm text-gray-300">{user.name}</span>
+              <span className="text-sm text-[#CBD5E1]">{user.name}</span>
             </div>
             <button
               onClick={handleLogout}
-              className="text-sm text-gray-400 hover:text-red-400 transition-colors duration-200 cursor-pointer border border-[#1f2937] hover:border-red-500/40 px-3 py-1.5 rounded-lg"
+              className="flex items-center gap-2 text-sm text-[#94A3B8] hover:text-red-400 transition-colors duration-200 cursor-pointer px-3 py-1.5 rounded-lg"
+              style={{ border: "1px solid rgba(255,255,255,0.08)" }}
             >
-              Sign Out
+              <LogOut size={16} /> Sign Out
             </button>
           </>
         ) : (
           <>
-            <Link to="/login" className="text-sm text-gray-400 hover:text-white transition-colors duration-200">Login</Link>
+            <Link to="/login" className="text-sm text-[#94A3B8] hover:text-[#F9FAFB] transition-colors duration-200">Login</Link>
             <Link
               to="/signup"
-              className="text-sm font-semibold px-4 py-2 rounded-lg bg-[#00ffaa] text-[#0d1117] hover:bg-[#00e699] transition-colors duration-200"
+              className="inline-flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-lg text-white transition-all duration-200 hover:brightness-110"
+              style={{ background: "linear-gradient(135deg,#7C3AED,#3B82F6)" }}
             >
-              Get Started
+              Get Started <ArrowRight size={16} />
             </Link>
           </>
         )}
       </div>
 
       {/* Mobile toggle */}
-      <button
-        className="md:hidden flex flex-col gap-1.5 cursor-pointer"
-        onClick={() => setMenuOpen(!menuOpen)}
-      >
-        <span className={`block w-5 h-0.5 bg-gray-400 transition-all duration-200 ${menuOpen ? 'rotate-45 translate-y-2' : ''}`} />
-        <span className={`block w-5 h-0.5 bg-gray-400 transition-all duration-200 ${menuOpen ? 'opacity-0' : ''}`} />
-        <span className={`block w-5 h-0.5 bg-gray-400 transition-all duration-200 ${menuOpen ? '-rotate-45 -translate-y-2' : ''}`} />
+      <button className="md:hidden text-[#94A3B8] cursor-pointer" onClick={() => setMenuOpen(!menuOpen)}>
+        {menuOpen ? <X size={24} /> : <Menu size={24} />}
       </button>
 
       {/* Mobile menu */}
       {menuOpen && (
-        <div className="absolute top-full left-0 right-0 bg-[#111827] border-b border-[#1f2937] flex flex-col gap-1 p-4 md:hidden">
-          <Link to="/" className="text-sm text-gray-400 hover:text-[#00ffaa] py-2" onClick={() => setMenuOpen(false)}>Home</Link>
+        <div
+          className="absolute top-full left-0 right-0 flex flex-col gap-1 p-4 md:hidden"
+          style={{
+            background: "rgba(11,15,26,0.95)",
+            backdropFilter: "blur(16px)",
+            borderBottom: "1px solid rgba(255,255,255,0.06)",
+          }}
+        >
+          <Link to="/" className="text-sm text-[#94A3B8] hover:text-[#F9FAFB] py-2" onClick={() => setMenuOpen(false)}>Home</Link>
           {user ? (
             <>
-              <Link to="/dashboard" className="text-sm text-gray-400 hover:text-[#00ffaa] py-2" onClick={() => setMenuOpen(false)}>Dashboard</Link>
-              <button onClick={handleLogout} className="text-sm text-left text-red-400 py-2 cursor-pointer">Sign Out</button>
+              <Link to="/dashboard" className="text-sm text-[#94A3B8] hover:text-[#F9FAFB] py-2" onClick={() => setMenuOpen(false)}>Dashboard</Link>
+              <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-left text-red-400 py-2 cursor-pointer">
+                <LogOut size={16} /> Sign Out
+              </button>
             </>
           ) : (
             <>
-              <Link to="/login" className="text-sm text-gray-400 hover:text-white py-2" onClick={() => setMenuOpen(false)}>Login</Link>
-              <Link to="/signup" className="text-sm font-semibold text-[#00ffaa] py-2" onClick={() => setMenuOpen(false)}>Get Started →</Link>
+              <Link to="/login" className="text-sm text-[#94A3B8] hover:text-[#F9FAFB] py-2" onClick={() => setMenuOpen(false)}>Login</Link>
+              <Link
+                to="/signup"
+                className="inline-flex items-center gap-2 text-sm font-bold py-2 bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent"
+                onClick={() => setMenuOpen(false)}
+              >
+                Get Started <ArrowRight size={16} />
+              </Link>
             </>
           )}
         </div>
@@ -86,3 +110,4 @@ const Navbar = () => {
 };
 
 export default Navbar;
+
