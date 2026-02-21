@@ -75,6 +75,7 @@ const NAV = [
   { id: "vulnerabilities", icon: <ShieldAlert size={18} />,     label: "Vulnerabilities" },
   { id: "report",          icon: <FileText size={18} />,        label: "Full Report" },
   { id: "agents",          icon: <Terminal size={18} />,        label: "Agent Logs" },
+  { id: "extension",       icon: <ScrollText size={18} />,     label: "Extension Reports" },
 ];
 
 /* ── Markdown renderer (handles fenced code blocks + bold) ── */
@@ -155,8 +156,16 @@ const Dashboard = () => {
   const [error, setError] = useState("");
 
   /* ── Scan form state ── */
-  const [repoUrl, setRepoUrl] = useState("");
   const [scanName, setScanName] = useState("");
+  /* ── Extension reports state ── */
+  const [extReports, setExtReports] = useState([]);
+  const [extReportsLoading, setExtReportsLoading] = useState(false);
+  const [selectedExtReport, setSelectedExtReport] = useState(null); // { meta, html }
+  const [extReportHtmlLoading, setExtReportHtmlLoading] = useState(false);
+  const [deletingExtReport, setDeletingExtReport] = useState(null); // scanId being deleted
+
+  /* ── Scan form state ── */
+  const [repoUrl, setRepoUrl] = useState("");
   const [scanSubmitting, setScanSubmitting] = useState(false);
   const [activeScanId, setActiveScanId] = useState(null);
   const [lastStartedScanId, setLastStartedScanId] = useState(null);
@@ -176,6 +185,55 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => { fetchScans(); }, [fetchScans]);
+
+  /* ── Fetch extension reports (listed under /api/extension/reports) ── */
+  const deleteExtReport = useCallback(async (scanId, e) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this report from the database? This cannot be undone.')) return;
+    setDeletingExtReport(scanId);
+    try {
+      await api.delete(`/extension/reports/${scanId}`);
+      setExtReports((prev) => prev.filter((r) => r.scanId !== scanId));
+      if (selectedExtReport?.meta?.scanId === scanId) setSelectedExtReport(null);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to delete report');
+    } finally {
+      setDeletingExtReport(null);
+    }
+  }, [selectedExtReport]);
+
+  const fetchExtReports = useCallback(async () => {
+    setExtReportsLoading(true);
+    try {
+      const res = await api.get("/extension/reports");
+      setExtReports(res.data);
+    } catch (err) {
+      if (err.response?.status !== 401) setError("Failed to load extension reports");
+    } finally {
+      setExtReportsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "extension") fetchExtReports();
+  }, [tab, fetchExtReports]);
+
+  /* ── Load full HTML for a selected extension report ── */
+  const selectExtReport = useCallback(async (meta) => {
+    setSelectedExtReport({ meta, html: null });
+    setExtReportHtmlLoading(true);
+    try {
+      const res = await api.get(`/extension/reports/${meta.scanId}/html`, {
+        responseType: "text",
+        transformResponse: [(d) => d], // prevent JSON parse
+      });
+      setSelectedExtReport({ meta, html: res.data });
+    } catch {
+      setError("Failed to load HTML report");
+    } finally {
+      setExtReportHtmlLoading(false);
+    }
+  }, []);
 
   /* ── Select a scan (load full details) ── */
   const selectScan = useCallback(async (scanId) => {
@@ -438,7 +496,9 @@ const Dashboard = () => {
               {tab === "scan" && "Run New Scan"}
               {tab === "vulnerabilities" && "Vulnerabilities"}
               {tab === "report" && "Full Security Report"}
+           
               {tab === "agents" && "Agent Activity Logs"}
+              {tab === "extension" && "Extension Reports"}
             </h1>
             <p className="text-[#94A3B8] text-sm">
               Welcome back, <span className="text-[#F9FAFB] font-medium">{user?.name}</span>
@@ -1802,6 +1862,128 @@ const Dashboard = () => {
                       <span className="text-[#CBD5E1]">
                         Awaiting next scan...<span className="text-[#7C3AED] animate-pulse">_</span>
                       </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {/* ── EXTENSION REPORTS TAB ── */}
+        {tab === "extension" && (
+          <div className="space-y-4">
+            {extReportsLoading ? (
+              <div className="flex items-center justify-center py-24">
+                <Loader2 size={36} className="animate-spin text-[#7C3AED]" />
+              </div>
+            ) : extReports.length === 0 ? (
+              <div className="p-12 rounded-xl text-center" style={glass}>
+                <Package size={48} className="mx-auto mb-4 text-[#94A3B8]/40" />
+                <p className="text-[#94A3B8] mb-2">No extension reports yet.</p>
+                <p className="text-xs text-[#475569]">
+                  Run a scan from the ZeroTrace VS Code extension and it will appear here automatically.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                {/* ── Report list (left panel) ── */}
+                <div className="lg:col-span-1 space-y-2">
+                  {extReports.map((r) => {
+                    const risk = riskLabel(r.riskScore);
+                    const isSelected = selectedExtReport?.meta?.scanId === r.scanId;
+                    return (
+                      <div
+                        key={r.scanId}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => selectExtReport(r)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') selectExtReport(r); }}
+                        className="w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 cursor-pointer"
+                        style={{
+                          background: isSelected ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.04)",
+                          border: isSelected
+                            ? "1px solid rgba(124,58,237,0.35)"
+                            : "1px solid rgba(255,255,255,0.06)",
+                        }}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${risk.bg} ${risk.color}`}>
+                            {risk.label}
+                          </span>
+                          <span className="text-xs text-[#475569]">{timeAgo(r.createdAt)}</span>
+                        </div>
+                        <div className="text-sm text-[#F9FAFB] font-mono truncate">
+                          {(r.targetPath || "").split(/[/\\]/).slice(-2).join("/")}
+                        </div>
+                        <div className="text-xs text-[#94A3B8] mt-0.5 truncate">{r.targetPath}</div>
+                        <div className="flex gap-3 mt-2 text-xs text-[#94A3B8]">
+                          <span className="text-red-400 font-semibold">{r.bySeverity?.critical ?? 0} crit</span>
+                          <span className="text-orange-400 font-semibold">{r.bySeverity?.high ?? 0} high</span>
+                          <span className="text-yellow-400 font-semibold">{r.bySeverity?.medium ?? 0} med</span>
+                          <span className="ml-auto">{r.vulnerabilityCount} total</span>
+                          <button
+                            onClick={(e) => deleteExtReport(r.scanId, e)}
+                            disabled={deletingExtReport === r.scanId}
+                            title="Delete report"
+                            className="ml-1 text-[#475569] hover:text-red-400 transition-colors disabled:opacity-40"
+                          >
+                            {deletingExtReport === r.scanId ? '…' : '🗑'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* ── HTML report viewer (right panel) ── */}
+                <div className="lg:col-span-2">
+                  {!selectedExtReport ? (
+                    <div className="flex items-center justify-center h-full min-h-[400px] rounded-xl" style={glass}>
+                      <div className="text-center">
+                        <FileText size={40} className="mx-auto mb-3 text-[#94A3B8]/40" />
+                        <p className="text-sm text-[#94A3B8]">Select a report to view it</p>
+                      </div>
+                    </div>
+                  ) : extReportHtmlLoading ? (
+                    <div className="flex items-center justify-center h-full min-h-[400px] rounded-xl" style={glass}>
+                      <Loader2 size={32} className="animate-spin text-[#7C3AED]" />
+                    </div>
+                  ) : (
+                    <div className="rounded-xl overflow-hidden" style={{ ...glass, height: "75vh" }}>
+                      {/* toolbar */}
+                      <div
+                        className="flex items-center gap-3 px-5 py-3 shrink-0"
+                        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}
+                      >
+                        <FileText size={15} className="text-[#7C3AED]" />
+                        <span className="text-sm font-medium text-[#F9FAFB] truncate flex-1">
+                          {selectedExtReport.meta.targetPath}
+                        </span>
+                        <span className="text-xs text-[#94A3B8]">{timeAgo(selectedExtReport.meta.createdAt)}</span>
+                        <a
+                          href={`${import.meta.env.VITE_API_URL ?? "http://localhost:5000/api"}/extension/reports/${selectedExtReport.meta.scanId}/html?token=${encodeURIComponent(localStorage.getItem('vexstorm_token') ?? '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs px-3 py-1 rounded-lg font-semibold transition-colors cursor-pointer text-[#A78BFA] hover:text-white"
+                          style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)" }}
+                        >
+                          Open full page ↗
+                        </a>
+                      </div>
+                      {/* iframe */}
+                      {selectedExtReport.html ? (
+                        <iframe
+                          title="ZeroTrace Extension Report"
+                          srcDoc={selectedExtReport.html}
+                          sandbox="allow-scripts allow-same-origin"
+                          className="w-full border-0"
+                          style={{ height: "calc(75vh - 48px)" }}
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-sm text-red-400">
+                          Report HTML is empty.
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

@@ -28,7 +28,11 @@ const SKIP_DIRS = new Set([
   // python envs
   'venv', '.venv', 'env', '.env',
   // misc generated / cache
+<<<<<<< HEAD
   '.vulentry', 'logs', 'log', 'tmp', 'temp', 'cache', '.cache',
+=======
+  '.zerotrace', 'logs', 'log', 'tmp', 'temp', 'cache', '.cache',
+>>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
   'public', 'static', 'assets', 'migrations', 'seeds',
 ]);
 

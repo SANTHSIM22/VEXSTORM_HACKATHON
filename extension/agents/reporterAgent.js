@@ -78,7 +78,11 @@ Keep it professional and actionable. Max 400 words.`;
    */
   saveJsonReport(report, outputDir) {
     try {
+<<<<<<< HEAD
       const filePath = path.join(outputDir, 'vulentry-report.json');
+=======
+      const filePath = path.join(outputDir, 'zerotrace-report.json');
+>>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
       fs.writeFileSync(filePath, JSON.stringify(report, null, 2), 'utf8');
       this.log(`JSON report saved: ${filePath}`);
       return filePath;
@@ -93,7 +97,11 @@ Keep it professional and actionable. Max 400 words.`;
    */
   saveHtmlReport(html, outputDir) {
     try {
+<<<<<<< HEAD
       const filePath = path.join(outputDir, 'vulentry-report.html');
+=======
+      const filePath = path.join(outputDir, 'zerotrace-report.html');
+>>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
       fs.writeFileSync(filePath, html, 'utf8');
       this.log(`HTML report saved: ${filePath}`);
       return filePath;
@@ -122,6 +130,18 @@ Keep it professional and actionable. Max 400 words.`;
       (!f.source) // untagged LLM findings
     );
 
+<<<<<<< HEAD
+=======
+    // Pull specialist agent findings
+    const authFindings     = options.authResults?.authFindings     || [];
+    const bizFindings      = options.bizResults?.bizFindings       || [];
+    const apiFindings      = options.apiResults?.apiFindings       || [];
+    const frontendFindings = options.frontendResults?.frontendFindings || [];
+    const infraFindings    = options.infraResults?.infraFindings   || [];
+    const cryptoFindings   = options.cryptoResults?.cryptoFindings  || [];
+    const loggingFindings  = options.cryptoResults?.loggingFindings || [];
+
+>>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
     // Build structured JSON report
     const reportJson = JSON.parse(await buildReportTool.invoke({
       targetPath:      scannerResult ? scannerResult.allFiles?.[0]?.filePath?.split(/[\\/]test[\\/]/)[0] || 'Unknown' : 'Unknown',
@@ -130,6 +150,16 @@ Keep it professional and actionable. Max 400 words.`;
       astFindings,
       depFindings,
       llmFindings,
+<<<<<<< HEAD
+=======
+      authFindings,
+      bizFindings,
+      apiFindings,
+      frontendFindings,
+      infraFindings,
+      cryptoFindings,
+      loggingFindings,
+>>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
       agentLogs: allAgentLogs,
       scanDurationMs: Date.now() - t0,
     }));
@@ -138,6 +168,7 @@ Keep it professional and actionable. Max 400 words.`;
     const executiveSummary = await this.generateExecutiveSummary(reportJson);
     reportJson.executiveSummary = executiveSummary;
 
+<<<<<<< HEAD
     // Render HTML
     this.log('Rendering HTML report...');
     let htmlReport = await renderHtmlReportTool.invoke({ report: reportJson });
@@ -151,6 +182,11 @@ Keep it professional and actionable. Max 400 words.`;
     <div style="padding:20px;line-height:1.8;white-space:pre-wrap;font-size:14px;color:#374151">${executiveSummary}</div>
   </div>`
     );
+=======
+    // Render HTML (executive summary is embedded by renderHtmlReportTool via r.executiveSummary)
+    this.log('Rendering HTML report...');
+    const htmlReport = await renderHtmlReportTool.invoke({ report: reportJson });
+>>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
 
     // Save reports if output dir provided
     let jsonPath = null;
