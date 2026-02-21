@@ -13,7 +13,7 @@ node_modules/
 # Build output
 dist/
 dist-ssr/
-out/
+out/git branch -M main
 build/
 *.local
 
