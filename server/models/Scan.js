@@ -1,14 +1,19 @@
 const mongoose = require('mongoose');
 
 const findingSchema = new mongoose.Schema({
+  id:               { type: String },
   type:             { type: String },
+  owaspCategory:    { type: String },
   severity:         { type: String },
+  cvssScore:        { type: Number },
+  confidenceScore:  { type: Number },
   endpoint:         { type: String },
   parameter:        { type: String },
   description:      { type: String },
   evidence:         { type: String },
+  exploitScenario:  { type: String },
+  impact:           { type: String },
   remediation:      { type: String },
-  cvssScore:        { type: Number },
   reproductionSteps:[{ type: String }],
   tags:             [{ type: String }],
 }, { _id: false });
@@ -39,23 +44,6 @@ const scanSchema = new mongoose.Schema({
   scanName: {
     type: String,
     default: '',
-  },
-  // 'extension' for VS Code extension uploads, 'dashboard' for web-initiated scans
-  source: {
-    type: String,
-    enum: ['extension', 'dashboard'],
-    default: 'dashboard',
-    index: true,
-  },
-  // Absolute file-system path (extension scans only)
-  targetPath: {
-    type: String,
-    default: null,
-  },
-  // Full HTML report body (extension scans only)
-  htmlReport: {
-    type: String,
-    default: null,
   },
   status: {
     type: String,

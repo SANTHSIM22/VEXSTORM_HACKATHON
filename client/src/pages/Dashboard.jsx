@@ -94,7 +94,7 @@ function renderMarkdown(text) {
           {lang && (
             <div className="text-[#7C3AED] text-[10px] mb-1.5 font-semibold uppercase tracking-wider">{lang}</div>
           )}
-          <code className="text-[#E2E8F0] whitespace-pre">{code}</code>
+          <code className="text-[#E2E8F0] whitespace-pre-wrap break-all">{code}</code>
         </pre>
       );
     }
@@ -542,7 +542,7 @@ const Dashboard = () => {
       </aside>
 
       {/* ── Main Content ── */}
-      <main className="flex-1 ml-64 p-8 relative z-10">
+      <main className="flex-1 ml-64 p-8 relative z-10 min-w-0 overflow-x-hidden">
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
@@ -1862,18 +1862,18 @@ const Dashboard = () => {
                                 </div>
                               )}
 
-                              <div className="rounded-xl overflow-hidden" style={glass}>
+                              <div className="rounded-xl overflow-hidden min-w-0" style={glass}>
                                 {/* Finding header */}
                                 <button
                                   onClick={toggleExpand}
-                                  className="w-full flex items-center gap-3 px-5 py-4 text-left cursor-pointer hover:bg-white/[0.03] transition-colors"
+                                  className="w-full flex items-center gap-3 px-5 py-4 text-left cursor-pointer hover:bg-white/[0.03] transition-colors min-w-0"
                                 >
                                   <span className={`text-xs px-2.5 py-1 rounded-full border font-bold shrink-0 ${sevStyle(v.severity)}`}>
                                     {v.severity}
                                   </span>
-                                  <span className="flex-1 text-sm font-semibold text-[#F9FAFB]">{v.type}</span>
+                                  <span className="flex-1 text-sm font-semibold text-[#F9FAFB] min-w-0 truncate">{v.type}</span>
                                   <span className="text-xs font-mono text-[#94A3B8] shrink-0 hidden sm:block truncate max-w-[200px]">{v.endpoint}</span>
-                                  <span className="text-xs text-[#94A3B8] shrink-0 hidden md:block">{v.owaspCategory || "—"}</span>
+                                  <span className="text-xs text-[#94A3B8] shrink-0 hidden md:block truncate max-w-[140px]">{v.owaspCategory || "—"}</span>
                                   <span className="text-xs font-mono font-bold shrink-0" style={{
                                     color: v.cvssScore >= 9 ? "#F87171" : v.cvssScore >= 7 ? "#FB923C" : v.cvssScore >= 4 ? "#FBBF24" : "#60A5FA"
                                   }}>
@@ -1886,7 +1886,7 @@ const Dashboard = () => {
 
                             {/* Expanded full detail */}
                             {isExpanded && (
-                              <div className="px-5 pb-6 space-y-5"
+                              <div className="px-5 pb-6 space-y-5 min-w-0 overflow-x-hidden"
                                 style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
 
                                 {/* Meta row */}
@@ -1924,41 +1924,41 @@ const Dashboard = () => {
 
                                 {/* Evidence */}
                                 {v.evidence && (
-                                  <div className="p-3 rounded-lg" style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.15)" }}>
+                                  <div className="p-3 rounded-lg overflow-hidden" style={{ background: "rgba(251,191,36,0.05)", border: "1px solid rgba(251,191,36,0.15)" }}>
                                     <div className="text-xs font-semibold text-[#FBBF24] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                                       <Eye size={12} /> Evidence
                                     </div>
-                                    <p className="text-sm text-[#CBD5E1] font-mono leading-relaxed">{v.evidence}</p>
+                                    <p className="text-sm text-[#CBD5E1] font-mono leading-relaxed break-all overflow-wrap-anywhere" style={{ overflowWrap: "anywhere", wordBreak: "break-all" }}>{v.evidence}</p>
                                   </div>
                                 )}
 
                                 {/* Exploit Scenario */}
                                 {v.exploitScenario && (
-                                  <div className="p-3 rounded-lg" style={{ background: "rgba(248,113,113,0.05)", border: "1px solid rgba(248,113,113,0.15)" }}>
+                                  <div className="p-3 rounded-lg overflow-hidden" style={{ background: "rgba(248,113,113,0.05)", border: "1px solid rgba(248,113,113,0.15)" }}>
                                     <div className="text-xs font-semibold text-[#F87171] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                                       <FlaskConical size={12} /> Exploit Scenario
                                     </div>
-                                    <p className="text-sm text-[#CBD5E1] leading-relaxed">{v.exploitScenario}</p>
+                                    <p className="text-sm text-[#CBD5E1] leading-relaxed" style={{ overflowWrap: "anywhere" }}>{v.exploitScenario}</p>
                                   </div>
                                 )}
 
                                 {/* Impact */}
                                 {v.impact && (
-                                  <div className="p-3 rounded-lg" style={{ background: "rgba(251,146,60,0.05)", border: "1px solid rgba(251,146,60,0.15)" }}>
+                                  <div className="p-3 rounded-lg overflow-hidden" style={{ background: "rgba(251,146,60,0.05)", border: "1px solid rgba(251,146,60,0.15)" }}>
                                     <div className="text-xs font-semibold text-[#FB923C] uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                                       <AlertTriangle size={12} /> Impact
                                     </div>
-                                    <p className="text-sm text-[#CBD5E1] leading-relaxed">{v.impact}</p>
+                                    <p className="text-sm text-[#CBD5E1] leading-relaxed" style={{ overflowWrap: "anywhere" }}>{v.impact}</p>
                                   </div>
                                 )}
 
                                 {/* Remediation */}
                                 {v.remediation && (
-                                  <div>
+                                  <div className="min-w-0">
                                     <div className="text-xs font-semibold text-[#22C55E] uppercase tracking-wider mb-2 flex items-center gap-1.5">
                                       <Wrench size={12} /> Remediation
                                     </div>
-                                    <div className="p-4 rounded-xl" style={{ background: "rgba(34,197,94,0.04)", border: "1px solid rgba(34,197,94,0.12)" }}>
+                                    <div className="p-4 rounded-xl overflow-hidden" style={{ background: "rgba(34,197,94,0.04)", border: "1px solid rgba(34,197,94,0.12)", overflowWrap: "anywhere" }}>
                                       {renderMarkdown(v.remediation)}
                                     </div>
                                   </div>

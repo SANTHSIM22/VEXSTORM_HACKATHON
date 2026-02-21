@@ -8,7 +8,7 @@ const express = require('express');
 const crypto  = require('crypto');
 const jwt     = require('jsonwebtoken');
 const { protect } = require('../middleware/auth');
-const Scan = require('../models/Scan');
+const ExtensionReport = require('../models/ExtensionReport');
 const User = require('../models/User');
 
 const router = express.Router();
@@ -44,12 +44,10 @@ router.post('/reports', protect, async (req, res) => {
   };
 
   try {
-    await Scan.create({
+    await ExtensionReport.create({
       scanId,
       userId:             req.user._id,
-      targetUrl:          targetPath,   // reuse targetUrl so existing queries still work
       targetPath,
-      source:             'extension',
       status:             'completed',
       htmlReport,
       summary:            summary || { riskLevel, totalFindings },
@@ -78,7 +76,7 @@ router.post('/reports', protect, async (req, res) => {
 // List all extension reports for the current user
 router.get('/reports', protect, async (req, res) => {
   try {
-    const docs = await Scan.find({ userId: req.user._id, source: 'extension' })
+    const docs = await ExtensionReport.find({ userId: req.user._id })
       .sort({ createdAt: -1 })
       .select('-htmlReport')   // don't send full HTML in list
       .lean();
@@ -125,10 +123,9 @@ router.get('/reports/:scanId/html', async (req, res) => {
   }
 
   try {
-    const doc = await Scan.findOne({
+    const doc = await ExtensionReport.findOne({
       scanId:  req.params.scanId,
       userId,
-      source:  'extension',
     }).select('htmlReport').lean();
 
     if (!doc) return res.status(404).send('<h3 style="font-family:sans-serif;color:#f87171">Report not found.</h3>');
@@ -145,10 +142,9 @@ router.get('/reports/:scanId/html', async (req, res) => {
 // Permanently remove an extension report from the DB.
 router.delete('/reports/:scanId', protect, async (req, res) => {
   try {
-    const deleted = await Scan.findOneAndDelete({
+    const deleted = await ExtensionReport.findOneAndDelete({
       scanId: req.params.scanId,
       userId: req.user._id,
-      source: 'extension',
     });
     if (!deleted) return res.status(404).json({ message: 'Report not found' });
     res.json({ message: 'Report deleted successfully' });
