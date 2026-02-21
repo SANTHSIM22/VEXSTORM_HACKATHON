@@ -3,21 +3,6 @@ import { useAuth } from "../context/AuthContext";
 import { useState } from "react";
 import { LogOut, ArrowRight, Menu, X } from "lucide-react";
 
-/* ── Zero Trace Logo ── */
-const ZeroTraceLogo = ({ size = 22 }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="16" cy="16" r="12" stroke="url(#zt-grad-nav)" strokeWidth="2.5" fill="none" />
-    <circle cx="16" cy="16" r="7" stroke="url(#zt-grad-nav)" strokeWidth="1.5" fill="none" opacity="0.5" />
-    <line x1="6" y1="26" x2="26" y2="6" stroke="url(#zt-grad-nav)" strokeWidth="2" strokeLinecap="round" />
-    <circle cx="16" cy="16" r="2.5" fill="url(#zt-grad-nav)" />
-    <defs>
-      <linearGradient id="zt-grad-nav" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#a855f7" />
-        <stop offset="100%" stopColor="#e9d5ff" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -36,13 +21,12 @@ const Navbar = () => {
         background: "rgba(11,15,26,0.8)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
-        borderBottom: "1px solid rgba(255,255,255,0.06)",
       }}
     >
       {/* Brand */}
       <Link to="/" className="flex items-center gap-2.5 text-white no-underline">
-        <ZeroTraceLogo size={24} />
-        <span className="text-lg font-extrabold tracking-widest text-[#F9FAFB]">
+        <img src="/logo.png" width={24} height={24} alt="Zero Trace" className="object-contain" />
+        <span className="brand-name text-xs text-[#F9FAFB]">
           ZERO<span className="bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent">TRACE</span>
         </span>
       </Link>

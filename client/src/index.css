@@ -7,7 +7,10 @@
   --color-surface: #050008;
   --color-card: #0f0018;
   --color-border: #3b0764;
-  --font-mono: 'Courier New', Courier, monospace;
+  --font-sans: 'Manrope', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Courier New', Courier, monospace;
+  --font-heading: 'Syne', system-ui, sans-serif;
+  --font-brand: 'Orbitron', sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -16,8 +19,26 @@ body {
   background: linear-gradient(135deg, #000000 0%, #0d0015 40%, #1a0030 70%, #0d0015 100%);
   background-attachment: fixed;
   color: #f3e8ff;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-weight: 400;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Syne', system-ui, sans-serif;
+  font-weight: 700;
+}
+
+.brand-name {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+code, pre, kbd, samp, .font-mono {
+  font-family: 'IBM Plex Mono', 'Courier New', Courier, monospace;
 }
 
 /* scrollbar */
