@@ -1,14 +1,19 @@
 const mongoose = require('mongoose');
 
 const findingSchema = new mongoose.Schema({
+  id:               { type: String },
   type:             { type: String },
+  owaspCategory:    { type: String },
   severity:         { type: String },
+  cvssScore:        { type: Number },
+  confidenceScore:  { type: Number },
   endpoint:         { type: String },
   parameter:        { type: String },
   description:      { type: String },
   evidence:         { type: String },
+  exploitScenario:  { type: String },
+  impact:           { type: String },
   remediation:      { type: String },
-  cvssScore:        { type: Number },
   reproductionSteps:[{ type: String }],
   tags:             [{ type: String }],
 }, { _id: false });
@@ -35,6 +40,10 @@ const scanSchema = new mongoose.Schema({
   targetUrl: {
     type: String,
     required: true,
+  },
+  scanName: {
+    type: String,
+    default: '',
   },
   status: {
     type: String,
@@ -74,20 +83,6 @@ const scanSchema = new mongoose.Schema({
   logs: {
     type: [logSchema],
     default: [],
-  },
-  // ─── Extension-scan extras ───────────────────────
-  source: {
-    type: String,
-    enum: ['web', 'extension'],
-    default: 'web',
-  },
-  targetPath: {
-    type: String,
-    default: null,
-  },
-  htmlReport: {
-    type: String,
-    default: null,
   },
 }, { timestamps: false });
 

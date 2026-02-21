@@ -1062,7 +1062,7 @@ const Landing = () => {
               Get ZeroTrace on VS Code Marketplace
             </a>
             <a
-              href="#"
+              href="https://github.com/SANTHSIM22/VEXSTORM_HACKATHON"
               target="_blank"
               rel="noopener noreferrer"
               className="px-7 py-3 rounded-xl font-semibold text-sm transition-all duration-300 border"

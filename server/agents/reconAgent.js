@@ -9,6 +9,30 @@ class ReconAgent extends BaseAgent {
         super('ReconAgent', 'Reconnaissance', logger, memory, findingsStore);
     }
 
+    /**
+     * Calculates confidence for reconnaissance findings based on path sensitivity and response signals.
+     * @param {object} factors
+     * @param {string}  factors.path - The discovered sensitive path
+     * @param {boolean} factors.statusIs200 - HTTP 200 response
+     * @param {number}  factors.contentLength - Response body length
+     * @param {boolean} factors.isHighSensitivity - Path is highly sensitive (e.g. .env, .git/HEAD)
+     * @returns {number} Confidence score between 0.1 and 1.0
+     */
+    _calculateConfidence({ path = '', statusIs200 = false, contentLength = 0, isHighSensitivity = false }) {
+        let score = 0.2; // base
+
+        // Path sensitivity
+        if (isHighSensitivity) score += 0.35;            // .env, .git/HEAD are critical
+        else score += 0.15;                              // admin, debug, status
+
+        // Response quality
+        if (statusIs200) score += 0.15;
+        if (contentLength > 200) score += 0.15;          // substantial content confirms it's real
+        else if (contentLength > 50) score += 0.1;
+
+        return Math.max(0.1, Math.min(1.0, parseFloat(score.toFixed(2))));
+    }
+
     async execute(target) {
         this.logger.info(`[ReconAgent] Starting reconnaissance on ${target}`);
 
@@ -44,13 +68,14 @@ class ReconAgent extends BaseAgent {
                     crawlResults.urls.push(`${baseOrigin}${path}`);
 
                     if (['/admin', '/debug', '/status', '/.env', '/.git/HEAD'].includes(path)) {
+                        const respBody = typeof response.data === 'string' ? response.data : '';
                         this.addFinding({
                             type: 'Information Disclosure',
                             endpoint: `${baseOrigin}${path}`,
                             parameter: 'N/A',
                             description: `Sensitive path ${path} is accessible (HTTP 200)`,
                             evidence: `Status: ${response.status}`,
-                            confidenceScore: 0.8,
+                            confidenceScore: this._calculateConfidence({ path, statusIs200: true, contentLength: respBody.length, isHighSensitivity: ['/.env', '/.git/HEAD'].includes(path) }),
                             exploitScenario: `An attacker can access ${path} to gather sensitive information about the application`,
                             impact: 'Information disclosure may lead to further attacks',
                             reproductionSteps: [

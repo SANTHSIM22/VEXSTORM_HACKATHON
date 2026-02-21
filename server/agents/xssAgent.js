@@ -13,6 +13,37 @@ class XSSAgent extends BaseAgent {
         this.goal = "Identify Reflected, Stored, and DOM-based XSS vulnerabilities by reasoning about input reflections and analyzing browser-side execution sinks.";
     }
 
+    /**
+     * Calculates confidence for XSS findings based on reflection quality and analysis signals.
+     * @param {object} factors
+     * @param {string}  factors.vulnType - 'reflected' | 'dom'
+     * @param {boolean} factors.isUnescaped - Payload reflected without encoding
+     * @param {boolean} factors.isReflected - Payload reflected at all (possibly encoded)
+     * @param {boolean} factors.llmSuspicious - LLM flagged response as suspicious
+     * @param {boolean} factors.payloadContainsHtml - Payload contains < or > (HTML context)
+     * @param {boolean} factors.hasSink - DOM sink found in page (e.g. innerHTML, document.write)
+     * @param {boolean} factors.hasSource - DOM source found (e.g. location.hash, location.search)
+     * @returns {number} Confidence score between 0.1 and 1.0
+     */
+    _calculateConfidence({ vulnType = 'reflected', isUnescaped = false, isReflected = false, llmSuspicious = false, payloadContainsHtml = false, hasSink = false, hasSource = false }) {
+        let score = 0;
+
+        if (vulnType === 'reflected') {
+            score = 0.15;
+            if (isUnescaped) score += 0.4;                // definitive: unescaped HTML reflected
+            else if (isReflected) score += 0.15;          // reflected but encoded
+            if (llmSuspicious) score += 0.15;
+            if (payloadContainsHtml) score += 0.1;        // payload had HTML chars, increasing relevance
+        } else if (vulnType === 'dom') {
+            score = 0.15;
+            if (hasSink) score += 0.25;                   // dangerous sink present
+            if (hasSource) score += 0.2;                  // user-controlled source present
+            if (hasSink && hasSource) score += 0.1;       // both = higher confidence
+        }
+
+        return Math.max(0.1, Math.min(1.0, parseFloat(score.toFixed(2))));
+    }
+
     async execute(target) {
         this.logger.info(`[XSSAgent] Goal: ${this.goal}`);
         const findings = [];
@@ -96,6 +127,7 @@ class XSSAgent extends BaseAgent {
 
                 if (analysis.suspicious || this.validator.detectReflection(payload, response.data).reflected) {
                     const isUnescaped = this._isUnescapedReflection(payload, response.data);
+                    const isReflected = this.validator.detectReflection(payload, response.data).reflected;
                     this.addFinding({
                         type: isUnescaped ? 'Reflected XSS' : 'XSS',
                         endpoint: url,
@@ -103,7 +135,7 @@ class XSSAgent extends BaseAgent {
                         description: `XSS detected: ${analysis.reasoning || 'Payload reflected in response'}`,
                         evidence: `Payload: ${payload}. LLM Status: ${analysis.suspicious}. Unescaped: ${isUnescaped}`,
                         payload,
-                        confidenceScore: isUnescaped ? 0.9 : 0.5,
+                        confidenceScore: this._calculateConfidence({ vulnType: 'reflected', isUnescaped, isReflected, llmSuspicious: !!analysis.suspicious, payloadContainsHtml: /[<>]/.test(payload) }),
                         exploitScenario: `User input in "${inputName}" is reflected uncurated, allowing script execution.`,
                         impact: 'Session theft, phishing, DOM manipulation',
                         reproductionSteps: [
@@ -145,7 +177,7 @@ class XSSAgent extends BaseAgent {
                 parameter: 'DOM',
                 description: `Potential DOM XSS via source ${foundSource} and sink ${foundSink}`,
                 evidence: `Source: ${foundSource}, Sink: ${foundSink} detected in client-side JS.`,
-                confidenceScore: 0.6,
+                confidenceScore: this._calculateConfidence({ vulnType: 'dom', hasSink: !!foundSink, hasSource: !!foundSource }),
                 exploitScenario: 'Attacker provides malicious string in hash/query that reaches an unsafe DOM sink.',
                 impact: 'Client-side code execution',
                 reproductionSteps: [

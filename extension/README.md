@@ -1,3 +1,70 @@
+<<<<<<< HEAD
+# Vulentry — Multi-Agent AI Security Scanner
+
+Vulentry scans your workspace for security vulnerabilities using a multi-agent pipeline powered by Mistral AI.
+
+## Features
+
+Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+
+For example if there is an image subfolder under your extension project workspace:
+
+\!\[feature X\]\(images/feature-x.png\)
+
+> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+
+## Requirements
+
+If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+
+## Extension Settings
+
+Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+
+For example:
+
+This extension contributes the following settings:
+
+* `myExtension.enable`: Enable/disable this extension.
+* `myExtension.thing`: Set to `blah` to do something.
+
+## Known Issues
+
+Calling out known issues can help limit users opening duplicate issues against your extension.
+
+## Release Notes
+
+Users appreciate release notes as you update your extension.
+
+### 1.0.0
+
+Initial release of ...
+
+### 1.0.1
+
+Fixed issue #.
+
+### 1.1.0
+
+Added features X, Y, and Z.
+
+---
+
+## Working with Markdown
+
+You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
+
+* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux)
+* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux)
+* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets
+
+## For more information
+
+* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
+* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+
+**Enjoy!**
+=======
 # ZeroTrace — Multi-Agent AI Security Scanner
 
 ZeroTrace is a VS Code extension that performs automated, in-depth security audits on your codebase using a multi-agent AI pipeline powered by Mistral AI and LangGraph. It deploys 10 specialized security agents to detect vulnerabilities across your entire project — from authentication flaws and injection attacks to cryptographic weaknesses and infrastructure misconfigurations.
@@ -78,3 +145,4 @@ Initial release of ZeroTrace.
 - 10-agent security pipeline with Mistral AI and LangGraph orchestration
 - Interactive HTML report with risk scoring, OWASP Top 10 mapping, and proof-of-concept viewer
 - Real-time scanning panel with per-agent progress tracking
+>>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe

@@ -151,6 +151,17 @@ code, pre, kbd, samp, .font-mono {
 }
 .float-orb { animation: float-slow 8s ease-in-out infinite; }
 
+/* auth vertical bars */
+@keyframes auth-bar-pulse {
+  0%   { opacity: 0.3; transform: scaleY(0.85); }
+  50%  { opacity: 1;   transform: scaleY(1); }
+  100% { opacity: 0.3; transform: scaleY(0.85); }
+}
+.auth-bar {
+  transform-origin: bottom;
+  animation: auth-bar-pulse 5s ease-in-out infinite;
+}
+
 /* shimmer */
 @keyframes shimmer {
   0% { background-position: -200% center; }
@@ -179,3 +190,73 @@ code, pre, kbd, samp, .font-mono {
   50% { box-shadow: 0 0 0 5px rgba(216,180,254,0); }
 }
 .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+/* ── Dashboard-specific utilities ── */
+
+/* Dashboard card hover */
+.dash-card {
+  transition: transform 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+}
+.dash-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255,255,255,0.14) !important;
+  background: rgba(255,255,255,0.07) !important;
+}
+
+/* Vuln table row hover */
+.vuln-row {
+  transition: background-color 0.2s ease;
+}
+.vuln-row:hover {
+  background-color: rgba(255,255,255,0.04);
+}
+
+/* Sidebar nav item hover motion */
+.nav-item-hover {
+  transition: all 0.2s ease;
+}
+.nav-item-hover:hover {
+  transform: translateX(3px);
+}
+
+/* Fade-in animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fadeIn {
+  animation: fadeIn 0.35s ease forwards;
+}
+
+/* Staggered fade-in */
+.stagger-1 { animation: fadeIn 0.35s ease 0.05s forwards; opacity: 0; }
+.stagger-2 { animation: fadeIn 0.35s ease 0.1s forwards; opacity: 0; }
+.stagger-3 { animation: fadeIn 0.35s ease 0.15s forwards; opacity: 0; }
+.stagger-4 { animation: fadeIn 0.35s ease 0.2s forwards; opacity: 0; }
+
+/* Subtle scale on hover for interactive panels */
+.panel-hover {
+  transition: border-color 0.25s ease, background 0.25s ease;
+}
+.panel-hover:hover {
+  border-color: rgba(255,255,255,0.12) !important;
+  background: rgba(255,255,255,0.06) !important;
+}
+
+/* Smooth focus ring for inputs */
+.input-focus:focus {
+  border-color: rgba(124,58,237,0.5) !important;
+  box-shadow: 0 0 0 2px rgba(124,58,237,0.15);
+}
+
+/* Primary gradient button hover */
+.btn-primary {
+  transition: filter 0.2s ease, transform 0.15s ease;
+}
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.15);
+  transform: translateY(-1px);
+}
+.btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}

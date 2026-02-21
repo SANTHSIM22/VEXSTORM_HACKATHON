@@ -11,7 +11,6 @@ const Orchestrator = require('../orchestrator/orchestrator');
 const FindingsStore = require('../intelligence/findingsStore');
 const ScanMemory = require('../intelligence/memory');
 const Logger = require('../utils/logger');
-const { createScanFolder, generateReport } = require('../reporting/reportGenerator');
 const Scan = require('../models/Scan');
 const User = require('../models/User');
 
@@ -19,14 +18,15 @@ const router = express.Router();
 
 // ─── POST /api/scans — Start a new scan ──────────────
 router.post('/', protect, async (req, res) => {
-  const { targetUrl, scanType } = req.body;
+  const { targetUrl, scanType, scanName } = req.body;
 
   if (!targetUrl) {
     return res.status(400).json({ message: 'targetUrl is required' });
   }
 
+  const trimmedName = (scanName || '').trim();
   const scanId = crypto.randomUUID();
-  const entry = createScanEntry(scanId, targetUrl, req.user._id.toString());
+  const entry = createScanEntry(scanId, targetUrl, req.user._id.toString(), trimmedName);
 
   // Persist initial scan document to MongoDB
   try {
@@ -34,6 +34,7 @@ router.post('/', protect, async (req, res) => {
       scanId,
       userId: req.user._id,
       targetUrl,
+      scanName: trimmedName,
       status: 'running',
       createdAt: entry.createdAt,
     });
@@ -46,6 +47,7 @@ router.post('/', protect, async (req, res) => {
     scanId,
     status: 'running',
     targetUrl,
+    scanName: trimmedName,
     createdAt: entry.createdAt,
   });
 
@@ -83,24 +85,26 @@ router.get('/', protect, async (req, res) => {
     ...inMemory.map((s) => ({
       scanId: s.scanId,
       targetUrl: s.targetUrl,
+      scanName: s.scanName,
       status: s.status,
+      currentPhase: s.currentPhase || null,
       createdAt: s.createdAt,
       completedAt: s.completedAt,
       vulnerabilityCount: s.vulnerabilityCount,
       riskScore: s.riskScore,
       bySeverity: s.bySeverity,
-      source: s.source || 'web',
     })),
     ...dbOnly.map((s) => ({
       scanId: s.scanId,
       targetUrl: s.targetUrl,
+      scanName: s.scanName,
       status: s.status,
+      currentPhase: null,
       createdAt: s.createdAt,
       completedAt: s.completedAt,
       vulnerabilityCount: s.vulnerabilityCount,
       riskScore: s.riskScore,
       bySeverity: s.bySeverity,
-      source: s.source || 'web',
     })),
   ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
@@ -115,7 +119,9 @@ router.get('/:scanId', protect, async (req, res) => {
     return res.json({
       scanId: entry.scanId,
       targetUrl: entry.targetUrl,
+      scanName: entry.scanName,
       status: entry.status,
+      currentPhase: entry.currentPhase || null,
       createdAt: entry.createdAt,
       completedAt: entry.completedAt,
       summary: entry.summary,
@@ -124,7 +130,6 @@ router.get('/:scanId', protect, async (req, res) => {
       vulnerabilityCount: entry.vulnerabilityCount,
       riskScore: entry.riskScore,
       bySeverity: entry.bySeverity,
-      source: entry.source || 'web',
     });
   }
 
@@ -135,7 +140,9 @@ router.get('/:scanId', protect, async (req, res) => {
     return res.json({
       scanId: doc.scanId,
       targetUrl: doc.targetUrl,
+      scanName: doc.scanName,
       status: doc.status,
+      currentPhase: null,
       createdAt: doc.createdAt,
       completedAt: doc.completedAt,
       summary: doc.summary,
@@ -144,7 +151,6 @@ router.get('/:scanId', protect, async (req, res) => {
       vulnerabilityCount: doc.vulnerabilityCount,
       riskScore: doc.riskScore,
       bySeverity: doc.bySeverity,
-      source: doc.source || 'web',
     });
   } catch (dbErr) {
     return res.status(500).json({ message: 'Database error', error: dbErr.message });
@@ -170,13 +176,10 @@ router.get('/:scanId/logs', protect, async (req, res) => {
 // Background scan runner
 // ──────────────────────────────────────────────
 async function runScan(entry, targetUrl, scanType, userId) {
-  let scanFolder;
   try {
-    scanFolder = createScanFolder();
-    const logger = new Logger(scanFolder);
+    const logger = new Logger(null);
     const findingsStore = new FindingsStore();
     const memory = new ScanMemory(targetUrl, {
-      scanFolder,
       scanType: scanType || 'full',
     });
 
@@ -190,8 +193,7 @@ async function runScan(entry, targetUrl, scanType, userId) {
     const orchestrator = new Orchestrator(logger, memory, findingsStore, entry);
     const report = await orchestrator.run(targetUrl);
 
-    // Generate file reports
-    await generateReport(scanFolder, targetUrl, report);
+    // File report generation disabled
 
     // Populate registry entry with final results
     entry.status = 'completed';

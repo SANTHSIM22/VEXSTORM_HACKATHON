@@ -11,6 +11,45 @@ class AccessControlAgent extends BaseAgent {
         this.validator = new ValidationEngine(logger);
     }
 
+    /**
+     * Calculates confidence score for access control findings based on evidence signals.
+     * @param {object} factors
+     * @param {boolean} factors.systemFileDetected - Whether system file content (e.g. /etc/passwd) was found in response
+     * @param {number}  factors.anomalyScore - Response anomaly score from validation engine (0-1)
+     * @param {boolean} factors.statusIs200 - Whether the HTTP response status was 200
+     * @param {boolean} factors.contentDiffers - Whether response content changed with the payload
+     * @param {number}  factors.contentLength - Length of response body
+     * @param {boolean} factors.paramNameRelevant - Whether the parameter name strongly matches the vuln type
+     * @param {string}  factors.vulnType - 'traversal' | 'idor' | 'forcedBrowsing'
+     * @returns {number} Confidence score between 0.1 and 1.0
+     */
+    _calculateConfidence({ systemFileDetected = false, anomalyScore = 0, statusIs200 = false, contentDiffers = false, contentLength = 0, paramNameRelevant = false, vulnType = 'traversal' }) {
+        let score = 0;
+
+        if (vulnType === 'traversal') {
+            score = 0.15;                                          // base
+            if (systemFileDetected) score += 0.55;                 // definitive proof
+            if (anomalyScore > 0) score += Math.min(anomalyScore * 0.3, 0.3); // behavioral signal
+            if (statusIs200) score += 0.05;                        // server accepted
+            if (paramNameRelevant) score += 0.05;                  // param name matches file-like pattern
+        } else if (vulnType === 'idor') {
+            score = 0.15;                                          // base
+            if (statusIs200) score += 0.1;                         // both returned 200
+            if (contentDiffers) score += 0.15;                     // different content for different IDs
+            if (contentLength > 500) score += 0.1;                 // substantial response bodies
+            else if (contentLength > 100) score += 0.05;
+            if (paramNameRelevant) score += 0.1;                   // param name strongly matches ID-like pattern
+        } else if (vulnType === 'forcedBrowsing') {
+            score = 0.25;                                          // base
+            if (statusIs200) score += 0.2;                         // page loads successfully
+            if (contentLength > 500) score += 0.15;                // has substantial content (not just a redirect page)
+            else if (contentLength > 100) score += 0.1;
+            if (paramNameRelevant) score += 0.1;                   // path contains sensitive keywords like 'admin'
+        }
+
+        return Math.max(0.1, Math.min(1.0, parseFloat(score.toFixed(2))));
+    }
+
     async execute(target) {
         const findings = [];
         const { parameters } = this.memory.attackSurface;
@@ -53,7 +92,7 @@ class AccessControlAgent extends BaseAgent {
                             description: `Path traversal vulnerability via "${param.param}" parameter`,
                             evidence: `System file contents detected in response with payload: ${payload}`,
                             payload,
-                            confidenceScore: 0.95,
+                            confidenceScore: this._calculateConfidence({ vulnType: 'traversal', systemFileDetected: true, anomalyScore: comparison.anomalyScore, statusIs200: testResponse.status === 200, paramNameRelevant: /file|path|include|dir/i.test(param.param) }),
                             exploitScenario: `Attacker reads arbitrary files via "${param.param}" parameter`,
                             impact: 'Arbitrary file read—credentials, configuration, and source code exposure',
                             reproductionSteps: [
@@ -73,7 +112,7 @@ class AccessControlAgent extends BaseAgent {
                             description: `Possible path traversal via "${param.param}" - response differs significantly`,
                             evidence: `Anomaly score: ${comparison.anomalyScore} with payload: ${payload}`,
                             payload,
-                            confidenceScore: 0.4,
+                            confidenceScore: this._calculateConfidence({ vulnType: 'traversal', systemFileDetected: false, anomalyScore: comparison.anomalyScore, statusIs200: testResponse.status === 200, paramNameRelevant: /file|path|include|dir/i.test(param.param) }),
                             exploitScenario: `Parameter "${param.param}" may allow directory traversal`,
                             impact: 'Potential file access',
                             reproductionSteps: [
@@ -116,7 +155,7 @@ class AccessControlAgent extends BaseAgent {
                             parameter: param.param,
                             description: `Possible IDOR - sequential ID access on "${param.param}" returns different data`,
                             evidence: `ID=1 and ID=2 both return 200 with different content`,
-                            confidenceScore: 0.5,
+                            confidenceScore: this._calculateConfidence({ vulnType: 'idor', statusIs200: true, contentDiffers: true, contentLength: Math.min(body1.length, body2.length), paramNameRelevant: /id|uid|user_id|account/i.test(param.param) }),
                             exploitScenario: `Attacker enumerates ${param.param} values to access other users' data`,
                             impact: "Unauthorized access to other users' data",
                             reproductionSteps: [
@@ -137,13 +176,14 @@ class AccessControlAgent extends BaseAgent {
             try {
                 const response = await makeRequest(`${baseOrigin}${path}`, { retries: 1, timeout: AC_TIMEOUT });
                 if (response.status === 200) {
+                    const respBody = typeof response.data === 'string' ? response.data : '';
                     this.addFinding({
                         type: 'Broken Access Control',
                         endpoint: `${baseOrigin}${path}`,
                         parameter: 'N/A',
                         description: `Admin path "${path}" accessible without authentication`,
                         evidence: `HTTP 200 response on ${path}`,
-                        confidenceScore: 0.65,
+                        confidenceScore: this._calculateConfidence({ vulnType: 'forcedBrowsing', statusIs200: true, contentLength: respBody.length, paramNameRelevant: /admin|manage|backend/i.test(path) }),
                         exploitScenario: `Attacker accesses ${path} without authentication`,
                         impact: 'Unauthorized admin access',
                         reproductionSteps: [
