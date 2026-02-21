@@ -1,9 +1,10 @@
 {
-  "name": "vulentry",
+  "name": "zerotrace",
   "publisher": "santhsim",
-  "displayName": "vulentry",
+  "displayName": "ZeroTrace",
   "description": "Multi-agent AI Security Scanner powered by LangGraph + Mistral",
-  "version": "0.0.1",
+  "version": "0.0.2",
+  "icon": "media/zerotrace.png",
   "engines": {
     "vscode": "^1.109.0"
   },
@@ -17,23 +18,23 @@
   "contributes": {
     "commands": [
       {
-        "command": "vulentry.runScan",
-        "title": "Vulentry: Run Security Scan on Folder"
+        "command": "zerotrace.runScan",
+        "title": "ZeroTrace: Run Security Scan on Folder"
       },
       {
-        "command": "vulentry.runScanOnOpen",
-        "title": "Vulentry: Scan Currently Open Workspace"
+        "command": "zerotrace.runScanOnOpen",
+        "title": "ZeroTrace: Scan Currently Open Workspace"
       }
     ],
     "configuration": {
-      "title": "Vulentry Security Scanner",
+      "title": "ZeroTrace Security Scanner",
       "properties": {
-        "vulentry.mistralApiKey": {
+        "zerotrace.mistralApiKey": {
           "type": "string",
           "default": "",
           "description": "Your Mistral API key (https://console.mistral.ai)"
         },
-        "vulentry.mistralModel": {
+        "zerotrace.mistralModel": {
           "type": "string",
           "default": "mistral-large-latest",
           "enum": [
@@ -44,12 +45,12 @@
           ],
           "description": "Mistral model to use for analysis"
         },
-        "vulentry.maxFileSizeKB": {
+        "zerotrace.maxFileSizeKB": {
           "type": "number",
           "default": 200,
           "description": "Skip files larger than this size (KB)"
         },
-        "vulentry.fileExtensions": {
+        "zerotrace.fileExtensions": {
           "type": "array",
           "default": [
             ".js",
@@ -88,6 +89,7 @@
     "ignore": "^5.3.2",
     "js-yaml": "^4.1.1",
     "langchain": "^0.3.37",
+    "pdfkit": "^0.17.2",
     "zod": "^3.25.76"
   },
   "devDependencies": {

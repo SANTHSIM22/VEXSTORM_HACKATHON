@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com https://fonts.gstatic.com; font-src https://fonts.gstatic.com; img-src {{cspSource}} data:;" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZeroTrace — Error</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0d0f12;
+      --surface:     #13161c;
+      --surface-2:   #1a1e27;
+      --border:      #262c38;
+      --border-2:    #2e3545;
+      --text:        #dce3ef;
+      --text-mid:    #9aa3ba;
+      --text-dim:    #6b7690;
+      --text-muted:  #3f4a5c;
+      --error:       #e53935;
+      --error-light: #ef9a9a;
+      --error-dim:   rgba(229,57,53,.08);
+      --error-border:rgba(229,57,53,.18);
+      --font-sans:   'IBM Plex Sans', sans-serif;
+      --font-mono:   'IBM Plex Mono', monospace;
+      --radius:      4px;
+      --radius-lg:   6px;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 2px; }
+
+    /* ── Card ── */
+    .error-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      max-width: 480px;
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+
+    /* ── Card header band ── */
+    .card-header {
+      width: 100%;
+      padding: 24px 28px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .error-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius);
+      background: var(--error-dim);
+      border: 1px solid var(--error-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .error-icon svg {
+      width: 16px;
+      height: 16px;
+      color: var(--error);
+    }
+
+    .card-header-text {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: -.01em;
+    }
+
+    .card-sub {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    /* ── Error details block ── */
+    .error-body {
+      width: 100%;
+      padding: 20px 28px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .block-label {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+    }
+
+    .error-pre-wrap {
+      background: var(--bg);
+      border: 1px solid var(--error-border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      overflow-x: auto;
+    }
+
+    .error-pre-wrap pre {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      line-height: 1.75;
+      color: var(--error-light);
+      white-space: pre-wrap;
+      word-break: break-word;
+      margin: 0;
+    }
+
+    /* ── Status row ── */
+    .status-row {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .status-cell {
+      padding: 14px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .status-cell:first-child {
+      border-right: 1px solid var(--border);
+    }
+
+    .status-cell-label {
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .status-cell-value {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--error);
+    }
+
+    /* ── Footer hint ── */
+    .card-footer {
+      width: 100%;
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .hint-text {
+      font-size: 11px;
+      color: var(--text-dim);
+      line-height: 1.5;
+      flex: 1;
+    }
+
+    .hint-path {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: var(--radius);
+      padding: 5px 10px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .hint-path svg {
+      width: 10px;
+      height: 10px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .chevron {
+      color: var(--text-muted);
+      font-size: 10px;
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="error-card">
+
+    <!-- Header -->
+    <div class="card-header">
+      <div class="error-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+      </div>
+      <div class="card-header-text">
+        <div class="card-title">Analysis Failed</div>
+        <div class="card-sub">ZeroTrace encountered an error</div>
+      </div>
+    </div>
+
+    <!-- Status cells -->
+    <div class="status-row">
+      <div class="status-cell">
+        <span class="status-cell-label">Status</span>
+        <span class="status-cell-value">FAILED</span>
+      </div>
+      <div class="status-cell">
+        <span class="status-cell-label">Time</span>
+        <span class="status-cell-value" id="errorTime">--:--:--</span>
+      </div>
+    </div>
+
+    <!-- Error details -->
+    <div class="error-body">
+      <div class="block-label">Error Details</div>
+      <div class="error-pre-wrap">
+        <pre>{{message}}</pre>
+      </div>
+    </div>
+
+    <!-- Footer hint -->
+    <div class="card-footer">
+      <span class="hint-text">Check the output panel for full diagnostic information.</span>
+      <div class="hint-path">
+        <span>Output</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+        <span>ZeroTrace</span>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    /* Inject timestamp at render time — no nonce needed, no external calls */
+    const n = new Date();
+    const pad = v => String(v).padStart(2, '0');
+    document.getElementById('errorTime').textContent =
+      pad(n.getHours()) + ':' + pad(n.getMinutes()) + ':' + pad(n.getSeconds());
+  </script>
+
+</body>
+</html>

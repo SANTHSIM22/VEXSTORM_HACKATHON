@@ -78,7 +78,7 @@ Keep it professional and actionable. Max 400 words.`;
    */
   saveJsonReport(report, outputDir) {
     try {
-      const filePath = path.join(outputDir, 'vulentry-report.json');
+      const filePath = path.join(outputDir, 'zerotrace-report.json');
       fs.writeFileSync(filePath, JSON.stringify(report, null, 2), 'utf8');
       this.log(`JSON report saved: ${filePath}`);
       return filePath;
@@ -93,7 +93,7 @@ Keep it professional and actionable. Max 400 words.`;
    */
   saveHtmlReport(html, outputDir) {
     try {
-      const filePath = path.join(outputDir, 'vulentry-report.html');
+      const filePath = path.join(outputDir, 'zerotrace-report.html');
       fs.writeFileSync(filePath, html, 'utf8');
       this.log(`HTML report saved: ${filePath}`);
       return filePath;

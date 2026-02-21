@@ -230,7 +230,7 @@ const gitignoreAuditTool = new DynamicStructuredTool({
       const checks = [
         { pattern: /\.env/, name: '.env', msg: '.env not in .gitignore — secrets will be committed' },
         { pattern: /node_modules/, name: 'node_modules', msg: 'node_modules not in .gitignore' },
-        { pattern: /\.vulentry/, name: '.vulentry', msg: '.vulentry report dir not in .gitignore' },
+        { pattern: /\.zerotrace/, name: '.zerotrace', msg: '.zerotrace report dir not in .gitignore' },
       ];
       for (const check of checks) {
         if (!check.pattern.test(content) && check.name === '.env') {

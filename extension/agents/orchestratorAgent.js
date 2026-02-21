@@ -158,7 +158,7 @@ function buildOrchestratorGraph() {
     try {
       const agent = new AuthSecurityAgent(logger);
       const result = await agent.run(state.scannerResult);
-      logger(`Auth analysis done: ${result.stats?.authFindings || 0} findings`);
+      logger(`Auth analysis done: ${result.stats?.findingsCount || 0} findings`);
       return { authResults: result, agentLogs: logs };
     } catch (e) {
       logs.push(`[ERROR] Auth analysis failed: ${e.message}`);
@@ -176,7 +176,7 @@ function buildOrchestratorGraph() {
     try {
       const agent = new BusinessLogicAgent(logger);
       const result = await agent.run(state.scannerResult);
-      logger(`Business logic done: ${result.stats?.bizFindings || 0} findings`);
+      logger(`Business logic done: ${result.stats?.findingsCount || 0} findings`);
       return { bizResults: result, agentLogs: logs };
     } catch (e) {
       logs.push(`[ERROR] Business logic failed: ${e.message}`);
@@ -194,7 +194,7 @@ function buildOrchestratorGraph() {
     try {
       const agent = new ApiSecurityAgent(logger);
       const result = await agent.run(state.scannerResult);
-      logger(`API security done: ${result.stats?.apiFindings || 0} findings`);
+      logger(`API security done: ${result.stats?.findingsCount || 0} findings`);
       return { apiResults: result, agentLogs: logs };
     } catch (e) {
       logs.push(`[ERROR] API security failed: ${e.message}`);
@@ -212,7 +212,7 @@ function buildOrchestratorGraph() {
     try {
       const agent = new FrontendSecurityAgent(logger);
       const result = await agent.run(state.scannerResult);
-      logger(`Frontend security done: ${result.stats?.frontendFindings || 0} findings`);
+      logger(`Frontend security done: ${result.stats?.findingsCount || 0} findings`);
       return { frontendResults: result, agentLogs: logs };
     } catch (e) {
       logs.push(`[ERROR] Frontend security failed: ${e.message}`);
@@ -230,7 +230,7 @@ function buildOrchestratorGraph() {
     try {
       const agent = new InfrastructureAgent(logger);
       const result = await agent.run(state.scannerResult);
-      logger(`Infrastructure done: ${result.stats?.infraFindings || 0} findings`);
+      logger(`Infrastructure done: ${result.stats?.findingsCount || 0} findings`);
       return { infraResults: result, agentLogs: logs };
     } catch (e) {
       logs.push(`[ERROR] Infrastructure analysis failed: ${e.message}`);
@@ -401,7 +401,7 @@ async function runSecurityScan(config) {
   const { targetPath, apiKey, model, options = {}, onProgress } = config;
 
   if (!targetPath) throw new Error('targetPath is required');
-  if (!apiKey)     throw new Error('Mistral API key is required. Set it in VS Code settings: vulentry.mistralApiKey');
+  if (!apiKey)     throw new Error('Mistral API key is required. Set it in VS Code settings: zerotrace.mistralApiKey');
 
   const app = buildOrchestratorGraph();
 
