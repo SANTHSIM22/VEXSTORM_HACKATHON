@@ -114,18 +114,32 @@ function renderMarkdown(text) {
 }
 
 
-/* ── Glass styles ── */
+/* ── Glass styles (matching landing page theme) ── */
 const glass = {
-  background: "rgba(255,255,255,0.05)",
-  backdropFilter: "blur(12px)",
-  WebkitBackdropFilter: "blur(12px)",
-  border: "1px solid rgba(255,255,255,0.08)",
-  boxShadow: "0 4px 24px rgba(0,0,0,0.25)",
+  background: "rgba(88,28,135,0.12)",
+  backdropFilter: "blur(20px)",
+  WebkitBackdropFilter: "blur(20px)",
+  border: "1px solid rgba(168,85,247,0.18)",
+  boxShadow: "0 8px 32px rgba(88,28,135,0.2), inset 0 1px 0 rgba(255,255,255,0.06)",
+};
+
+const glassHover = {
+  background: "rgba(255,255,255,0.06)",
+  border: "1px solid rgba(255,255,255,0.12)",
+  boxShadow: "0 12px 40px rgba(124,58,237,0.15), inset 0 1px 0 rgba(255,255,255,0.08)",
 };
 
 const glassSubtle = {
   background: "rgba(255,255,255,0.03)",
-  border: "1px solid rgba(255,255,255,0.06)",
+  border: "1px solid rgba(168,85,247,0.1)",
+};
+
+const glassDark = {
+  background: "rgba(0,0,0,0.35)",
+  backdropFilter: "blur(20px)",
+  WebkitBackdropFilter: "blur(20px)",
+  border: "1px solid rgba(168,85,247,0.15)",
+  boxShadow: "0 16px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04)",
 };
 
 
@@ -240,21 +254,30 @@ const Dashboard = () => {
     try {
       const res = await api.get(`/scans/${scanId}`);
       setSelectedScan(res.data);
-      if (res.data.status === "running") setActiveScanId(scanId);
+      if (res.data.status === "running") {
+        setActiveScanId(scanId);
+        setLastStartedScanId(scanId); // track running scans even after page refresh
+      }
     } catch {
       setError("Failed to load scan details");
     }
   }, []);
 
-  /* ── Auto-select latest completed scan ── */
+  /* ── Auto-select latest scan; switch to scan tab if one is running ── */
   useEffect(() => {
     if (scans.length > 0 && !selectedScan && !activeScanId) {
-      const latest = scans.find((s) => s.status === "completed") || scans[0];
-      if (latest) selectScan(latest.scanId);
+      const running = scans.find((s) => s.status === "running");
+      if (running) {
+        selectScan(running.scanId);
+        setTab("scan"); // show the live scan panel
+      } else {
+        const latest = scans.find((s) => s.status === "completed") || scans[0];
+        if (latest) selectScan(latest.scanId);
+      }
     }
   }, [scans, selectedScan, activeScanId, selectScan]);
 
-  /* ── Poll running scan every 3 s ── */
+  /* ── Poll running scan every 2 s ── */
   useEffect(() => {
     if (!activeScanId) return;
     const poll = async () => {
@@ -267,6 +290,7 @@ const Dashboard = () => {
               ? {
                   ...s,
                   status: res.data.status,
+                  currentPhase: res.data.currentPhase,
                   vulnerabilityCount: res.data.vulnerabilityCount,
                   riskScore: res.data.riskScore,
                   bySeverity: res.data.bySeverity,
@@ -284,7 +308,7 @@ const Dashboard = () => {
       }
     };
     poll();
-    const id = setInterval(poll, 3000);
+    const id = setInterval(poll, 2000);
     return () => clearInterval(id);
   }, [activeScanId, fetchScans]);
 
@@ -308,6 +332,7 @@ const Dashboard = () => {
           targetUrl: repoUrl,
           scanName: scanName.trim(),
           status: "running",
+          currentPhase: null,
           createdAt: res.data.createdAt,
           vulnerabilityCount: 0,
           riskScore: 0,
@@ -321,6 +346,7 @@ const Dashboard = () => {
         targetUrl: repoUrl,
         scanName: scanName.trim(),
         status: "running",
+        currentPhase: null,
         createdAt: res.data.createdAt,
         vulnerabilities: [],
         logs: [],
@@ -356,8 +382,8 @@ const Dashboard = () => {
   const sevTotal = aggSev.critical + aggSev.high + aggSev.medium + aggSev.low || 1;
 
   const scanInProgress =
-    lastStartedScanId &&
-    selectedScan?.scanId === lastStartedScanId &&
+    activeScanId &&
+    selectedScan?.scanId === activeScanId &&
     selectedScan?.status === "running";
 
   const scanJustDone =
@@ -366,7 +392,7 @@ const Dashboard = () => {
     selectedScan?.status &&
     selectedScan.status !== "running";
 
-  /* ── Derive current phase from latest log ── */
+  /* ── Phase tracking (uses backend currentPhase, falls back to log detection) ── */
   const PHASES = [
     { key: "recon",      label: "Reconnaissance",   icon: Radio,    color: "#06B6D4" },
     { key: "planning",   label: "AI Planning",       icon: Layers,   color: "#7C3AED" },
@@ -376,21 +402,29 @@ const Dashboard = () => {
     { key: "done",       label: "Report Generated",  icon: FileText, color: "#22C55E" },
   ];
 
-  function currentPhaseIndex(logs = []) {
+  const PHASE_KEY_MAP = { recon: 0, planning: 1, scanning: 2, risk: 3, remediation: 4, done: 5 };
+
+  function phaseIndexFromBackend(scan) {
+    if (!scan) return -1;
+    // Use backend-reported currentPhase if available
+    if (scan.currentPhase && PHASE_KEY_MAP[scan.currentPhase] !== undefined) {
+      return PHASE_KEY_MAP[scan.currentPhase];
+    }
+    // Fallback: detect from log messages
     let idx = -1;
-    for (const l of logs) {
+    for (const l of (scan.logs || [])) {
       const msg = (l.msg || "").toLowerCase();
       if (msg.includes("recon")) idx = Math.max(idx, 0);
       if (msg.includes("planning") || msg.includes("strategy")) idx = Math.max(idx, 1);
-      if (msg.includes("scanning") || msg.includes("executing")) idx = Math.max(idx, 2);
-      if (msg.includes("risk")) idx = Math.max(idx, 3);
-      if (msg.includes("remediation") || msg.includes("fix")) idx = Math.max(idx, 4);
-      if (msg.includes("complete") || msg.includes("completed")) idx = Math.max(idx, 5);
+      if (msg.includes("scanning") || msg.includes("executing") || msg.includes("deploying agents")) idx = Math.max(idx, 2);
+      if (msg.includes("risk scor")) idx = Math.max(idx, 3);
+      if (msg.includes("remediation")) idx = Math.max(idx, 4);
+      if (msg.includes("scan complete")) idx = Math.max(idx, 5);
     }
     return idx;
   }
 
-  const livePhaseIdx = selectedScan ? currentPhaseIndex(selectedScan.logs) : -1;
+  const livePhaseIdx = phaseIndexFromBackend(selectedScan);
 
   /* ── Close filter dropdowns on outside click ── */
   useEffect(() => {
@@ -416,27 +450,35 @@ const Dashboard = () => {
   /* ── Loading screen ── */
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen" style={{ background: "#0B0F1A" }}>
-        <Loader2 className="animate-spin text-[#7C3AED]" size={40} />
+      <div className="loading-screen">
+        <div className="loader-ring" />
+        <span className="text-sm font-mono text-[#a855f7]">Loading dashboard...</span>
       </div>
     );
   }
 
 
   return (
-    <div className="relative flex min-h-screen" style={{ background: "#0B0F1A" }}>
-      {/* Ambient background glow */}
+    <div className="relative flex min-h-screen text-[#f3e8ff]" style={{ background: "linear-gradient(135deg, #000000 0%, #0d0015 40%, #1a0030 70%, #0d0015 100%)", backgroundAttachment: "fixed" }}>
+      {/* Ambient orbs (matching landing) */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute -top-40 -left-40 w-[600px] h-[600px] rounded-full opacity-20"
-          style={{ background: "radial-gradient(circle, rgba(124,58,237,0.4) 0%, transparent 70%)", filter: "blur(120px)" }} />
-        <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] rounded-full opacity-15"
-          style={{ background: "radial-gradient(circle, rgba(59,130,246,0.4) 0%, transparent 70%)", filter: "blur(120px)" }} />
+        <div className="absolute -top-[25%] -left-[15%] w-[800px] h-[800px] rounded-full float-orb"
+          style={{ background: "radial-gradient(circle, rgba(124,58,237,0.12) 0%, transparent 65%)", filter: "blur(80px)" }} />
+        <div className="absolute top-[40%] -right-[20%] w-[600px] h-[600px] rounded-full float-orb"
+          style={{ background: "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 65%)", filter: "blur(80px)", animationDelay: "3s" }} />
+        <div className="absolute -bottom-[25%] left-[30%] w-[700px] h-[700px] rounded-full float-orb"
+          style={{ background: "radial-gradient(circle, rgba(124,58,237,0.06) 0%, transparent 65%)", filter: "blur(80px)", animationDelay: "6s" }} />
       </div>
 
       {/* ── Sidebar ── */}
       <aside
         className="w-64 shrink-0 fixed left-0 top-0 bottom-0 z-40 flex flex-col py-6 px-4"
-        style={{ background: "#111827", borderRight: "1px solid rgba(255,255,255,0.06)" }}
+        style={{
+          background: "rgba(5,0,8,0.85)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
+          borderRight: "1px solid rgba(168,85,247,0.12)",
+        }}
       >
         <div className="flex items-center gap-2.5 mb-10 px-2">
           <img src="/logo.png" width={32} height={32} alt="Zero Trace" className="object-contain" />
@@ -445,41 +487,54 @@ const Dashboard = () => {
           </span>
         </div>
 
-        <nav className="flex-1 space-y-1">
-          {NAV.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setTab(item.id)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer nav-item-hover ${
-                tab === item.id
-                  ? "text-[#F9FAFB]"
-                  : "text-[#94A3B8] hover:text-[#F9FAFB] hover:bg-white/[0.04]"
-              }`}
-              style={tab === item.id ? { background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.25)" } : {}}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-              {item.id === "scan" && activeScanId && (
-                <span className="ml-auto w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              )}
-            </button>
-          ))}
+        {/* Nav sections */}
+        <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a855f7]/60 px-3 mb-2 font-mono">Report</div>
+        <nav className="flex-1 space-y-0.5">
+          {NAV.map((item, idx) => {
+            const sectionBreaks = { vulnerabilities: "Analysis", extension: "Findings" };
+            return (
+              <div key={item.id}>
+                {sectionBreaks[item.id] && (
+                  <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a855f7]/60 px-3 mt-5 mb-2 font-mono">{sectionBreaks[item.id]}</div>
+                )}
+                <button
+                  onClick={() => setTab(item.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 cursor-pointer nav-item-hover ${
+                    tab === item.id
+                      ? "text-[#f3e8ff] font-semibold"
+                      : "text-[#a78bfa]/60 hover:text-[#f3e8ff] hover:bg-[#a855f7]/5"
+                  }`}
+                  style={tab === item.id ? {
+                    background: "rgba(168,85,247,0.12)",
+                    border: "1px solid rgba(168,85,247,0.25)",
+                    boxShadow: "0 0 20px rgba(168,85,247,0.08)",
+                  } : { border: "1px solid transparent" }}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                  {item.id === "scan" && activeScanId && (
+                    <span className="ml-auto w-2 h-2 rounded-full bg-green-400 pulse-dot" />
+                  )}
+                </button>
+              </div>
+            );
+          })}
         </nav>
 
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }} className="pt-4 mt-4">
+        <div style={{ borderTop: "1px solid rgba(168,85,247,0.12)" }} className="pt-4 mt-2">
           <div className="flex items-center gap-3 px-2">
             <div
-              className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-[#F9FAFB]"
-              style={{ background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.3)" }}
+              className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-[#f3e8ff]"
+              style={{ background: "rgba(168,85,247,0.2)", border: "1px solid rgba(168,85,247,0.3)" }}
             >
               {user?.name?.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-medium text-[#F9FAFB] truncate">{user?.name}</div>
-              <div className="text-xs text-[#94A3B8] truncate">{user?.email}</div>
+              <div className="text-sm font-medium text-[#f3e8ff] truncate">{user?.name}</div>
+              <div className="text-xs text-[#a78bfa]/60 truncate">{user?.email}</div>
             </div>
             <button onClick={handleLogout} title="Sign out"
-              className="text-[#94A3B8] hover:text-red-400 transition-colors cursor-pointer">
+              className="text-[#a78bfa]/60 hover:text-red-400 transition-colors cursor-pointer">
               <LogOut size={18} />
             </button>
           </div>
@@ -491,7 +546,7 @@ const Dashboard = () => {
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-extrabold text-[#F9FAFB] mb-1">
+            <h1 className="text-2xl font-extrabold text-[#f3e8ff] mb-1 font-heading">
               {tab === "overview" && "Security Overview"}
               {tab === "scan" && "Run New Scan"}
               {tab === "vulnerabilities" && "Vulnerabilities"}
@@ -500,16 +555,42 @@ const Dashboard = () => {
               {tab === "agents" && "Agent Activity Logs"}
               {tab === "extension" && "Extension Reports"}
             </h1>
-            <p className="text-[#94A3B8] text-sm">
-              Welcome back, <span className="text-[#F9FAFB] font-medium">{user?.name}</span>
+            <p className="text-[#a78bfa]/60 text-sm">
+              Welcome back, <span className="text-[#f3e8ff] font-medium">{user?.name}</span>
             </p>
           </div>
+          {/* Risk score badge (like screenshot) */}
+          {selectedScan && selectedScan.status === "completed" && tab === "overview" && (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl" style={{
+              border: selectedScan.riskScore >= 7 ? "1px solid rgba(248,113,113,0.3)" : "1px solid rgba(168,85,247,0.2)",
+              background: selectedScan.riskScore >= 7 ? "rgba(248,113,113,0.06)" : "rgba(168,85,247,0.06)",
+            }}>
+              <span className="text-xs font-bold uppercase tracking-wider text-[#a78bfa]/80 font-mono">Risk Score</span>
+              <span className="text-lg font-extrabold font-mono" style={{
+                color: selectedScan.riskScore >= 9 ? "#f87171" :
+                  selectedScan.riskScore >= 7 ? "#fb923c" :
+                  selectedScan.riskScore >= 4 ? "#fbbf24" : "#4ade80"
+              }}>
+                {Math.round((selectedScan.riskScore || 0) * 10)}/100
+              </span>
+              <span className="text-xs font-bold px-2 py-0.5 rounded-md" style={{
+                background: selectedScan.riskScore >= 9 ? "rgba(248,113,113,0.15)" :
+                  selectedScan.riskScore >= 7 ? "rgba(251,146,60,0.15)" :
+                  selectedScan.riskScore >= 4 ? "rgba(251,191,36,0.15)" : "rgba(74,222,128,0.15)",
+                color: selectedScan.riskScore >= 9 ? "#f87171" :
+                  selectedScan.riskScore >= 7 ? "#fb923c" :
+                  selectedScan.riskScore >= 4 ? "#fbbf24" : "#4ade80",
+              }}>
+                — {riskLabel(selectedScan.riskScore).label}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Error banner */}
         {error && (
           <div className="mb-6 flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-red-300"
-            style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)" }}>
+            style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
             <AlertCircle size={18} />
             <span>{error}</span>
             <button onClick={() => setError("")} className="ml-auto text-red-400 hover:text-red-300 cursor-pointer text-xs">Dismiss</button>
@@ -518,28 +599,120 @@ const Dashboard = () => {
 
         {/* ── OVERVIEW TAB ── */}
         {tab === "overview" && (
-          <div className="space-y-6 animate-fadeIn">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { icon: <ShieldAlert size={24} className="text-[#F87171]" />, val: String(aggSev.critical), label: "Critical Issues", color: "#F87171" },
-                { icon: <History size={24} className="text-[#7C3AED]" />, val: String(scans.length), label: "Scans Run", color: "#7C3AED" },
-                { icon: <Target size={24} className="text-[#3B82F6]" />, val: String(totalVulns), label: "Total Vulnerabilities", color: "#3B82F6" },
-                { icon: <RefreshCw size={24} className="text-[#7C3AED]" />, val: String(scans.filter((s) => s.status === "running").length), label: "Running Scans", color: "#7C3AED" },
-              ].map((k, i) => (
-                <div key={i} className={`p-5 rounded-xl dash-card stagger-${i + 1}`} style={glass}>
-                  <div className="text-2xl mb-3">{k.icon}</div>
-                  <div className="text-3xl font-extrabold mb-0.5" style={{ color: k.color }}>{k.val}</div>
-                  <div className="text-xs text-[#94A3B8]">{k.label}</div>
+          <div className="space-y-8 animate-fadeIn">
+
+            {/* ── Scan Info Bar (like screenshot header) ── */}
+            {selectedScan && selectedScan.status === "completed" && (
+              <div className="rounded-xl p-5" style={glass}>
+                <div className="flex items-center gap-1.5 mb-3">
+                  <Shield size={14} className="text-[#a855f7]" />
+                  <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a855f7]/80 font-mono">Latest Scan</span>
                 </div>
-              ))}
+                <div className="text-base font-bold text-[#f3e8ff] font-mono mb-3 truncate">
+                  {selectedScan.scanName || selectedScan.targetUrl}
+                </div>
+                <div className="flex flex-wrap gap-x-8 gap-y-2">
+                  {[
+                    { label: "Generated", value: selectedScan.completedAt ? new Date(selectedScan.completedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) + ' at ' + new Date(selectedScan.completedAt).toLocaleTimeString() : 'N/A' },
+                    { label: "Duration", value: selectedScan.summary?.duration || 'N/A' },
+                    { label: "Scanner", value: "ZeroTrace — Multi-Agent Security Scanner v3" },
+                    { label: "Model", value: "Mistral AI (LangGraph Orchestration)" },
+                    { label: "Agents", value: selectedScan.summary?.agentsRun?.length || 'N/A' },
+                  ].map((m) => (
+                    <div key={m.label}>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#a78bfa]/50 font-mono">{m.label}</div>
+                      <div className="text-sm text-[#f3e8ff] font-medium mt-0.5">{m.value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Executive Dashboard (matching screenshot layout) ── */}
+            <div>
+              <h2 className="text-lg font-extrabold text-[#f3e8ff] mb-4 font-heading uppercase tracking-wider flex items-center gap-2">
+                <LayoutDashboard size={18} className="text-[#a855f7]" />
+                Executive Dashboard
+              </h2>
+              <div className="rounded-xl overflow-hidden" style={glass}>
+                <div className="grid grid-cols-2 lg:grid-cols-5 divide-x divide-[#a855f7]/10">
+                  {[
+                    { val: String(totalVulns), label: "Total Findings", sub: "across all agents", color: "#f3e8ff" },
+                    { val: String(aggSev.critical), label: "Critical", sub: "requires immediate action", color: "#f87171" },
+                    { val: String(aggSev.high), label: "High", sub: "fix within 7 days", color: "#fb923c" },
+                    { val: String(aggSev.medium), label: "Medium", sub: "plan remediation", color: "#fbbf24" },
+                    { val: String(aggSev.low + (aggSev.info || 0)), label: "Low / Info", sub: "track & monitor", color: "#60a5fa" },
+                  ].map((k, i) => (
+                    <div key={i} className="p-6 text-center transition-all duration-300 hover:bg-[#a855f7]/5 cursor-default">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.15em] text-[#a78bfa]/50 font-mono mb-2">{k.label}</div>
+                      <div className="text-4xl font-extrabold mb-1 font-heading" style={{ color: k.color }}>{k.val}</div>
+                      <div className="text-[11px] text-[#a78bfa]/40">{k.sub}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
+            {/* ── Severity Distribution (matching screenshot table) ── */}
+            <div>
+              <h2 className="text-lg font-extrabold text-[#f3e8ff] mb-4 font-heading uppercase tracking-wider flex items-center gap-2">
+                <Activity size={18} className="text-[#a855f7]" />
+                Severity Distribution
+              </h2>
+              <div className="rounded-xl overflow-hidden" style={glass}>
+                {/* Table header */}
+                <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "1px solid rgba(168,85,247,0.1)" }}>
+                  <h3 className="text-sm font-bold text-[#f3e8ff] font-heading uppercase tracking-wider">Finding Breakdown by Severity</h3>
+                  <span className="text-sm text-[#a78bfa]/60 font-mono">{totalVulns} total</span>
+                </div>
+                {/* Column headers */}
+                <div className="grid grid-cols-[120px_1fr_100px_80px] gap-4 px-6 py-3 text-[10px] font-bold uppercase tracking-[0.15em] text-[#a78bfa]/50 font-mono"
+                  style={{ borderBottom: "1px solid rgba(168,85,247,0.08)" }}>
+                  <span>Severity</span>
+                  <span>Distribution</span>
+                  <span className="text-right">Count</span>
+                  <span className="text-right">Share</span>
+                </div>
+                {/* Severity rows */}
+                {[
+                  { label: "CRITICAL", count: aggSev.critical, color: "#f87171", bg: "rgba(248,113,113,0.15)", border: "rgba(248,113,113,0.3)" },
+                  { label: "HIGH", count: aggSev.high, color: "#fb923c", bg: "rgba(251,146,60,0.15)", border: "rgba(251,146,60,0.3)" },
+                  { label: "MEDIUM", count: aggSev.medium, color: "#fbbf24", bg: "rgba(251,191,36,0.15)", border: "rgba(251,191,36,0.3)" },
+                  { label: "LOW", count: aggSev.low, color: "#60a5fa", bg: "rgba(96,165,250,0.15)", border: "rgba(96,165,250,0.3)" },
+                  { label: "INFO", count: aggSev.info || 0, color: "#94a3b8", bg: "rgba(148,163,184,0.1)", border: "rgba(148,163,184,0.2)" },
+                ].map((item, i) => (
+                  <div key={i} className="grid grid-cols-[120px_1fr_100px_80px] gap-4 items-center px-6 py-3.5 transition-colors hover:bg-[#a855f7]/5"
+                    style={{ borderBottom: i < 4 ? "1px solid rgba(168,85,247,0.06)" : "none" }}>
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-md w-fit" style={{
+                      background: item.bg,
+                      border: `1px solid ${item.border}`,
+                      color: item.color,
+                    }}>{item.label}</span>
+                    <div className="h-2.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.04)" }}>
+                      <div className="h-full rounded-full transition-all duration-700" style={{
+                        width: `${totalVulns > 0 ? (item.count / totalVulns) * 100 : 0}%`,
+                        background: `linear-gradient(90deg, ${item.color}, ${item.color}aa)`,
+                        minWidth: item.count > 0 ? "8px" : "0px",
+                      }} />
+                    </div>
+                    <span className="text-right text-lg font-extrabold font-mono" style={{ color: item.color }}>{item.count}</span>
+                    <span className="text-right text-sm text-[#a78bfa]/60 font-mono">
+                      {totalVulns > 0 ? ((item.count / totalVulns) * 100).toFixed(1) : "0.0"}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Recent Scans + Quick Actions ── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Recent Scans */}
               <div className="p-6 rounded-xl panel-hover" style={glass}>
-                <h3 className="font-bold mb-4 text-[#F9FAFB]">Recent Scans</h3>
+                <h3 className="font-bold mb-4 text-[#f3e8ff] font-heading uppercase tracking-wider text-sm flex items-center gap-2">
+                  <History size={16} className="text-[#a855f7]" /> Recent Scans
+                </h3>
                 {scans.length === 0 ? (
-                  <p className="text-sm text-[#94A3B8]">No scans yet. Start a new scan to see results here.</p>
+                  <p className="text-sm text-[#a78bfa]/60">No scans yet. Start a new scan to see results here.</p>
                 ) : (
                   <div className="space-y-3">
                     {scans.slice(0, 5).map((s, i) => {
@@ -553,18 +726,18 @@ const Dashboard = () => {
                         <div
                           key={s.scanId}
                           onClick={() => selectScan(s.scanId)}
-                          className="flex items-center justify-between py-2 cursor-pointer hover:bg-white/[0.03] -mx-2 px-2 rounded-lg transition-colors"
-                          style={{ borderBottom: i < Math.min(scans.length, 5) - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}
+                          className="flex items-center justify-between py-2.5 cursor-pointer hover:bg-[#a855f7]/5 -mx-2 px-2 rounded-lg transition-colors"
+                          style={{ borderBottom: i < Math.min(scans.length, 5) - 1 ? "1px solid rgba(168,85,247,0.08)" : "none" }}
                         >
                           <div>
-                            <div className="text-sm text-[#F9FAFB] font-mono truncate max-w-[260px]">{s.scanName || s.targetUrl}</div>
-                            <div className="text-xs text-[#94A3B8] mt-0.5">{timeAgo(s.createdAt)}</div>
+                            <div className="text-sm text-[#f3e8ff] font-mono truncate max-w-[260px]">{s.scanName || s.targetUrl}</div>
+                            <div className="text-xs text-[#a78bfa]/50 mt-0.5">{timeAgo(s.createdAt)}</div>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${badge.bg} ${badge.color}`}>
                               {badge.label}
                             </span>
-                            {s.status === "completed" && <span className="text-xs text-[#94A3B8]">{s.vulnerabilityCount} vulns</span>}
+                            {s.status === "completed" && <span className="text-xs text-[#a78bfa]/50">{s.vulnerabilityCount} vulns</span>}
                             {s.status === "running" && <Loader2 size={14} className="animate-spin text-green-400" />}
                           </div>
                         </div>
@@ -574,11 +747,30 @@ const Dashboard = () => {
                 )}
               </div>
 
-              {/* Severity Breakdown */}
+              {/* Quick Stats / Agent Coverage */}
               <div className="p-6 rounded-xl panel-hover" style={glass}>
-                <h3 className="font-bold mb-5 text-[#F9FAFB]">Severity Breakdown</h3>
-                {totalVulns === 0 ? (
-                  <p className="text-sm text-[#94A3B8]">No vulnerability data available yet.</p>
+                <h3 className="font-bold mb-4 text-[#f3e8ff] font-heading uppercase tracking-wider text-sm flex items-center gap-2">
+                  <Cpu size={16} className="text-[#a855f7]" /> Agent Coverage
+                </h3>
+                {selectedScan?.summary?.agentsRun?.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedScan.summary.agentsRun.map((agent) => (
+                      <div key={agent} className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors hover:bg-[#a855f7]/5"
+                        style={glassSubtle}>
+                        <span className="w-2 h-2 rounded-full bg-[#a855f7] shrink-0" />
+                        <span className={`text-xs font-bold shrink-0 ${agentColor(agent)}`}>{agent}</span>
+                        <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "rgba(168,85,247,0.1)" }}>
+                          <div className="h-full rounded-full" style={{
+                            width: "100%",
+                            background: "linear-gradient(90deg, #7c3aed, #a855f7)",
+                          }} />
+                        </div>
+                        <CheckCircle2 size={14} className="text-green-400 shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                ) : totalVulns === 0 ? (
+                  <p className="text-sm text-[#a78bfa]/60">No vulnerability data available yet.</p>
                 ) : (
                   <div className="space-y-4">
                     {[
@@ -589,13 +781,13 @@ const Dashboard = () => {
                     ].map((item, i) => (
                       <div key={i} className="flex items-center gap-3">
                         <span className="text-xs font-semibold w-16 shrink-0" style={{ color: item.color }}>{item.label}</span>
-                        <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                        <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: "rgba(168,85,247,0.08)" }}>
                           <div
                             className="h-full rounded-full transition-all duration-500"
                             style={{ width: `${(item.count / sevTotal) * 100}%`, background: item.color }}
                           />
                         </div>
-                        <span className="text-xs text-[#94A3B8] w-4 text-right">{item.count}</span>
+                        <span className="text-xs text-[#a78bfa]/60 w-4 text-right">{item.count}</span>
                       </div>
                     ))}
                   </div>
@@ -613,8 +805,8 @@ const Dashboard = () => {
             {!scanInProgress && !scanJustDone && (
               <div className="max-w-3xl">
                 <div className="p-6 rounded-xl" style={glass}>
-                  <h3 className="font-bold text-[#F9FAFB] mb-1">Target URL</h3>
-                  <p className="text-sm text-[#94A3B8] mb-5">Enter any web URL to start the autonomous multi-agent vulnerability audit.</p>
+                  <h3 className="font-bold text-[#f3e8ff] mb-1 font-heading">Target URL</h3>
+                  <p className="text-sm text-[#a78bfa]/60 mb-5">Enter any web URL to start the autonomous multi-agent vulnerability audit.</p>
                   <form onSubmit={handleScan} className="space-y-3">
                     <div className="flex gap-3">
                       <input
@@ -622,16 +814,16 @@ const Dashboard = () => {
                         placeholder="Scan name (optional)"
                         value={scanName}
                         onChange={(e) => setScanName(e.target.value)}
-                        className="w-1/3 px-4 py-3 rounded-lg text-[#F9FAFB] placeholder-[#94A3B8]/40 text-sm focus:outline-none transition-all input-focus"
-                        style={{ background: "#0B0F1A", border: "1px solid rgba(255,255,255,0.08)" }}
+                        className="w-1/3 px-4 py-3 rounded-lg text-[#f3e8ff] placeholder-[#a78bfa]/30 text-sm focus:outline-none transition-all input-focus"
+                        style={{ background: "rgba(5,0,8,0.6)", border: "1px solid rgba(168,85,247,0.15)" }}
                       />
                       <input
                         type="text"
                         placeholder="https://example.com"
                         value={repoUrl}
                         onChange={(e) => setRepoUrl(e.target.value)}
-                        className="flex-1 px-4 py-3 rounded-lg text-[#F9FAFB] placeholder-[#94A3B8]/40 text-sm focus:outline-none transition-all input-focus"
-                        style={{ background: "#0B0F1A", border: "1px solid rgba(255,255,255,0.08)" }}
+                        className="flex-1 px-4 py-3 rounded-lg text-[#f3e8ff] placeholder-[#a78bfa]/30 text-sm focus:outline-none transition-all input-focus"
+                        style={{ background: "rgba(5,0,8,0.6)", border: "1px solid rgba(168,85,247,0.15)" }}
                       />
                     </div>
                     <div className="flex justify-end">
@@ -1055,12 +1247,12 @@ const Dashboard = () => {
             {/* Scan selector */}
             {scans.filter((s) => s.status === "completed").length > 0 && (
               <div className="mb-5 flex items-center gap-3">
-                <label className="text-sm text-[#94A3B8]">Scan:</label>
+                <label className="text-sm text-[#a78bfa]/60">Scan:</label>
                 <select
                   value={selectedScan?.scanId || ""}
                   onChange={(e) => { selectScan(e.target.value); setVulnFilterSev(new Set()); setVulnFilterOwasp(new Set()); setVulnFilterType(new Set()); }}
-                  className="px-3 py-1.5 rounded-lg text-sm text-[#F9FAFB] focus:outline-none cursor-pointer transition-colors input-focus"
-                  style={{ background: "#0B0F1A", border: "1px solid rgba(255,255,255,0.08)" }}
+                  className="px-3 py-1.5 rounded-lg text-sm text-[#f3e8ff] focus:outline-none cursor-pointer transition-colors input-focus"
+                  style={{ background: "rgba(5,0,8,0.6)", border: "1px solid rgba(168,85,247,0.15)" }}
                 >
                   {scans
                     .filter((s) => s.status === "completed")
@@ -1313,12 +1505,12 @@ const Dashboard = () => {
             {/* Scan selector */}
             {scans.filter((s) => s.status === "completed").length > 0 && (
               <div className="flex items-center gap-3">
-                <label className="text-sm text-[#94A3B8]">Scan:</label>
+                <label className="text-sm text-[#a78bfa]/60">Scan:</label>
                 <select
                   value={selectedScan?.scanId || ""}
                   onChange={(e) => { selectScan(e.target.value); setExpandedFindings(new Set()); setFilterSeverity(new Set()); setFilterOwasp(new Set()); setFilterType(new Set()); }}
-                  className="px-3 py-1.5 rounded-lg text-sm text-[#F9FAFB] focus:outline-none cursor-pointer"
-                  style={{ background: "#0B0F1A", border: "1px solid rgba(255,255,255,0.08)" }}
+                  className="px-3 py-1.5 rounded-lg text-sm text-[#f3e8ff] focus:outline-none cursor-pointer"
+                  style={{ background: "rgba(5,0,8,0.6)", border: "1px solid rgba(168,85,247,0.15)" }}
                 >
                   {scans.filter((s) => s.status === "completed").map((s) => (
                     <option key={s.scanId} value={s.scanId}>
@@ -1792,12 +1984,12 @@ const Dashboard = () => {
             {/* Scan selector for logs */}
             {scans.length > 0 && (
               <div className="flex items-center gap-3">
-                <label className="text-sm text-[#94A3B8]">Scan:</label>
+                <label className="text-sm text-[#a78bfa]/60">Scan:</label>
                 <select
                   value={selectedScan?.scanId || ""}
                   onChange={(e) => selectScan(e.target.value)}
-                  className="px-3 py-1.5 rounded-lg text-sm text-[#F9FAFB] focus:outline-none cursor-pointer"
-                  style={{ background: "#0B0F1A", border: "1px solid rgba(255,255,255,0.08)" }}
+                  className="px-3 py-1.5 rounded-lg text-sm text-[#f3e8ff] focus:outline-none cursor-pointer"
+                  style={{ background: "rgba(5,0,8,0.6)", border: "1px solid rgba(168,85,247,0.15)" }}
                 >
                   {scans.map((s) => (
                     <option key={s.scanId} value={s.scanId}>
