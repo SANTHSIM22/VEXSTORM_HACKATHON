@@ -12,6 +12,7 @@ function createScanEntry(scanId, targetUrl, userId, scanName = '') {
     scanName,
     userId,
     status: 'running',
+    currentPhase: null,
     createdAt: new Date().toISOString(),
     completedAt: null,
     logs: [],

@@ -19,6 +19,21 @@ class Orchestrator {
             agent,
             msg,
         });
+        // Sync live phase
+        this.registryRef.currentPhase = this.state;
+    }
+
+    /** Sync live findings count to registry so poll can see progress mid-scan */
+    _syncFindings() {
+        if (!this.registryRef) return;
+        const findings = this.findingsStore.all();
+        this.registryRef.vulnerabilityCount = findings.length;
+        const sev = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+        for (const f of findings) {
+            const s = (f.severity || '').toLowerCase();
+            if (sev[s] !== undefined) sev[s]++;
+        }
+        this.registryRef.bySeverity = sev;
     }
 
     async run(target) {
@@ -68,10 +83,15 @@ class Orchestrator {
                     this._updateRegistry(`Executing ${agentName} agent...`, agentName);
                     await agent.run(target);
                     this.memory.statistics.agentsRun.push(agentName);
+                    this._syncFindings(); // push live counts after each agent
                 }
             }
 
+            // Sync after all scanning agents done
+            this._syncFindings();
+
             // Phase 4: Risk Scoring
+            this.state = 'risk';
             this.logger.info('\n--- Phase 4: Risk Scoring ---');
             this._updateRegistry('Phase 4: Risk Scoring — Calculating severity...');
             const findings = this.findingsStore.all();

@@ -86,7 +86,9 @@ router.get('/', protect, async (req, res) => {
     ...inMemory.map((s) => ({
       scanId: s.scanId,
       targetUrl: s.targetUrl,
+      scanName: s.scanName,
       status: s.status,
+      currentPhase: s.currentPhase || null,
       createdAt: s.createdAt,
       completedAt: s.completedAt,
       vulnerabilityCount: s.vulnerabilityCount,
@@ -96,7 +98,9 @@ router.get('/', protect, async (req, res) => {
     ...dbOnly.map((s) => ({
       scanId: s.scanId,
       targetUrl: s.targetUrl,
+      scanName: s.scanName,
       status: s.status,
+      currentPhase: null,
       createdAt: s.createdAt,
       completedAt: s.completedAt,
       vulnerabilityCount: s.vulnerabilityCount,
@@ -116,7 +120,9 @@ router.get('/:scanId', protect, async (req, res) => {
     return res.json({
       scanId: entry.scanId,
       targetUrl: entry.targetUrl,
+      scanName: entry.scanName,
       status: entry.status,
+      currentPhase: entry.currentPhase || null,
       createdAt: entry.createdAt,
       completedAt: entry.completedAt,
       summary: entry.summary,
@@ -135,7 +141,9 @@ router.get('/:scanId', protect, async (req, res) => {
     return res.json({
       scanId: doc.scanId,
       targetUrl: doc.targetUrl,
+      scanName: doc.scanName,
       status: doc.status,
+      currentPhase: null,
       createdAt: doc.createdAt,
       completedAt: doc.completedAt,
       summary: doc.summary,
