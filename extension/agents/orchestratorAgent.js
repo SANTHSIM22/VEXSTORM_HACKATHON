@@ -38,15 +38,12 @@ const PatternAnalysisAgent = require('./patternAnalysisAgent');
 const LLMAnalyzerAgent     = require('./llmAnalyzerAgent');
 const VerifierAgent        = require('./verifierAgent');
 const ReporterAgent        = require('./reporterAgent');
-<<<<<<< HEAD
-=======
 const AuthSecurityAgent    = require('./authSecurityAgent');
 const BusinessLogicAgent   = require('./businessLogicAgent');
 const ApiSecurityAgent     = require('./apiSecurityAgent');
 const FrontendSecurityAgent = require('./frontendSecurityAgent');
 const InfrastructureAgent  = require('./infrastructureAgent');
 const CryptoLoggingAgent   = require('./cryptoLoggingAgent');
->>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
 
 // ─── State definition using LangGraph Annotation ─────────────────────────────
 const SecurityScanState = Annotation.Root({
@@ -66,8 +63,6 @@ const SecurityScanState = Annotation.Root({
   verifierResults: Annotation({ reducer: (_, y) => y, default: () => null }),
   reportResults:   Annotation({ reducer: (_, y) => y, default: () => null }),
 
-<<<<<<< HEAD
-=======
   // Specialist agent outputs
   authResults:     Annotation({ reducer: (_, y) => y, default: () => null }),
   bizResults:      Annotation({ reducer: (_, y) => y, default: () => null }),
@@ -76,7 +71,6 @@ const SecurityScanState = Annotation.Root({
   infraResults:    Annotation({ reducer: (_, y) => y, default: () => null }),
   cryptoResults:   Annotation({ reducer: (_, y) => y, default: () => null }),
 
->>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
   // Accumulated logs from all agents
   agentLogs: Annotation({
     reducer: (existing, newLogs) => [...(existing || []), ...(newLogs || [])],
@@ -154,9 +148,6 @@ function buildOrchestratorGraph() {
     }
   });
 
-<<<<<<< HEAD
-  // ── Node 3: LLM Analyzer ───────────────────────────────────────────────────
-=======
   // ── Node 3a: Auth Security ─────────────────────────────────────────────────
   graph.addNode('authNode', async (state) => {
     const logs = [];
@@ -266,7 +257,6 @@ function buildOrchestratorGraph() {
   });
 
   // ── Node 4: LLM Analyzer ───────────────────────────────────────────────────
->>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
   graph.addNode('llmAnalyzer', async (state) => {
     const logs = [];
     const logger = (msg) => {
@@ -354,9 +344,6 @@ function buildOrchestratorGraph() {
         state.verifierResults,
         state.scannerResult,
         state.agentLogs,
-<<<<<<< HEAD
-        { outputDir: state.options?.outputDir }
-=======
         {
           outputDir:       state.options?.outputDir,
           authResults:     state.authResults,
@@ -366,7 +353,6 @@ function buildOrchestratorGraph() {
           infraResults:    state.infraResults,
           cryptoResults:   state.cryptoResults,
         }
->>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
       );
 
       logger('Report generation complete');
@@ -385,9 +371,6 @@ function buildOrchestratorGraph() {
   // ── Edges ──────────────────────────────────────────────────────────────────
   graph.addEdge(START, 'scanner');
   graph.addEdge('scanner', 'patternAnalysis');
-<<<<<<< HEAD
-  graph.addEdge('patternAnalysis', 'llmAnalyzer');
-=======
   graph.addEdge('patternAnalysis', 'authNode');
   graph.addEdge('authNode', 'bizNode');
   graph.addEdge('bizNode', 'apiNode');
@@ -395,7 +378,6 @@ function buildOrchestratorGraph() {
   graph.addEdge('frontendNode', 'infraNode');
   graph.addEdge('infraNode', 'cryptoNode');
   graph.addEdge('cryptoNode', 'llmAnalyzer');
->>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
   graph.addEdge('llmAnalyzer', 'verifier');
   graph.addEdge('verifier', 'reporter');
   graph.addEdge('reporter', END);
@@ -419,11 +401,7 @@ async function runSecurityScan(config) {
   const { targetPath, apiKey, model, options = {}, onProgress } = config;
 
   if (!targetPath) throw new Error('targetPath is required');
-<<<<<<< HEAD
-  if (!apiKey)     throw new Error('Mistral API key is required. Set it in VS Code settings: vulentry.mistralApiKey');
-=======
   if (!apiKey)     throw new Error('Mistral API key is required. Set it in VS Code settings: zerotrace.mistralApiKey');
->>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
 
   const app = buildOrchestratorGraph();
 
@@ -456,15 +434,12 @@ async function runSecurityScan(config) {
       pattern:   finalState.patternResults?.stats,
       llm:       finalState.llmResults?.stats,
       verifier:  finalState.verifierResults?.stats,
-<<<<<<< HEAD
-=======
       auth:      finalState.authResults?.stats,
       biz:       finalState.bizResults?.stats,
       api:       finalState.apiResults?.stats,
       frontend:  finalState.frontendResults?.stats,
       infra:     finalState.infraResults?.stats,
       crypto:    finalState.cryptoResults?.stats,
->>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
     },
   };
 }

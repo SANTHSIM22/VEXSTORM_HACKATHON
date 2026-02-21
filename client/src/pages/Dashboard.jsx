@@ -1872,6 +1872,19 @@ const Dashboard = () => {
         {/* ── EXTENSION REPORTS TAB ── */}
         {tab === "extension" && (
           <div className="space-y-4">
+            {/* Header row with refresh */}
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-[#94A3B8]">Reports uploaded from the ZeroTrace VS Code extension</p>
+              <button
+                onClick={fetchExtReports}
+                disabled={extReportsLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)", color: "#A78BFA" }}
+              >
+                <RefreshCw size={13} className={extReportsLoading ? "animate-spin" : ""} />
+                Refresh
+              </button>
+            </div>
             {extReportsLoading ? (
               <div className="flex items-center justify-center py-24">
                 <Loader2 size={36} className="animate-spin text-[#7C3AED]" />

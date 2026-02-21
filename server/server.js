@@ -9,7 +9,8 @@ const { createScanFolder, generateReport } = require('./reporting/reportGenerato
 validateConfig();
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Store scan results in memory
 const scanResults = {};

@@ -1,15 +1,4 @@
 /**
-<<<<<<< HEAD
- * PATTERN ANALYSIS AGENT
- * Responsibility: Run all static/regex/AST tools against the scanned files.
- * No LLM calls — pure deterministic analysis. Fast and comprehensive.
- *
- * Tools used:
- *   - patternScanFileTool (regex-based OWASP patterns)
- *   - secretScanFileTool  (credential/secret detection)
- *   - astScanFileTool     (AST-level JS analysis)
- *   - auditPackageJsonTool (dependency CVE check)
-=======
  * PATTERN ANALYSIS AGENT  v2
  * Responsibility: Run ALL static/regex/AST tools against the scanned files.
  * No LLM calls — pure deterministic analysis. Fast and comprehensive.
@@ -26,7 +15,6 @@
  *   - infraScanFileTool       (Docker/CI/CD/Infra)
  *   - cryptoScanTool          (cryptographic weaknesses)
  *   - loggingScanTool         (logging & monitoring gaps)
->>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
  */
 
 'use strict';
@@ -35,15 +23,12 @@ const { patternScanFileTool } = require('../tools/patternScanTools');
 const { secretScanFileTool }   = require('../tools/secretScanTools');
 const { astScanFileTool }      = require('../tools/astScanTools');
 const { auditPackageJsonTool, auditRequirementsTxtTool } = require('../tools/dependencyTools');
-<<<<<<< HEAD
-=======
 const { authScanFileTool, detectMissingAuthTool, rbacAuditTool } = require('../tools/authAnalysisTools');
 const { businessLogicScanTool, stateTransitionAuditTool } = require('../tools/businessLogicTools');
 const { apiSecurityScanTool, securityHeadersTool } = require('../tools/apiSecurityTools');
 const { frontendSecurityScanTool, nextjsConfigAuditTool } = require('../tools/frontendSecurityTools');
 const { infraScanFileTool, gitignoreAuditTool } = require('../tools/infraScanTools');
 const { cryptoScanTool, loggingScanTool } = require('../tools/cryptoLoggingTools');
->>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
 
 class PatternAnalysisAgent {
   constructor(logger) {
@@ -63,12 +48,6 @@ class PatternAnalysisAgent {
     const t0 = Date.now();
     this.log('Starting pattern + secret + AST analysis...');
 
-<<<<<<< HEAD
-    const patternFindings = [];
-    const secretFindings  = [];
-    const astFindings     = [];
-    const depFindings     = [];
-=======
     const patternFindings  = [];
     const secretFindings   = [];
     const astFindings      = [];
@@ -80,7 +59,6 @@ class PatternAnalysisAgent {
     const infraFindings    = [];
     const cryptoFindings   = [];
     const loggingFindings  = [];
->>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
 
     const allFiles = scannerResult.allFiles || [];
     const total = allFiles.length;
@@ -113,8 +91,6 @@ class PatternAnalysisAgent {
       } catch (e) {
         this.log(`Secret scan error on ${file.filePath}: ${e.message}`);
       }
-<<<<<<< HEAD
-=======
 
       // Auth analysis
       try {
@@ -189,7 +165,6 @@ class PatternAnalysisAgent {
         );
         if (mr.findings?.length > 0) authFindings.push(...mr.findings);
       } catch (e) { /* non-critical */ }
->>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
     }
 
     // ── AST scan only JS files ───────────────────────────────────────────────
@@ -238,15 +213,10 @@ class PatternAnalysisAgent {
     const elapsed = Date.now() - t0;
     this.log(
       `Pattern analysis done in ${elapsed}ms — ` +
-<<<<<<< HEAD
-      `${patternFindings.length} pattern | ${secretFindings.length} secret | ` +
-      `${astFindings.length} AST | ${depFindings.length} dependency findings`
-=======
       `pattern:${patternFindings.length} | secret:${secretFindings.length} | ` +
       `AST:${astFindings.length} | dep:${depFindings.length} | auth:${authFindings.length} | ` +
       `biz:${bizFindings.length} | api:${apiFindings.length} | fe:${frontendFindings.length} | ` +
       `infra:${infraFindings.length} | crypto:${cryptoFindings.length} | log:${loggingFindings.length}`
->>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
     );
 
     return {
@@ -254,14 +224,6 @@ class PatternAnalysisAgent {
       secretFindings,
       astFindings,
       depFindings,
-<<<<<<< HEAD
-      stats: {
-        patternFindings: patternFindings.length,
-        secretFindings:  secretFindings.length,
-        astFindings:     astFindings.length,
-        depFindings:     depFindings.length,
-        durationMs:      elapsed,
-=======
       authFindings,
       bizFindings,
       apiFindings,
@@ -282,7 +244,6 @@ class PatternAnalysisAgent {
         cryptoFindings:   cryptoFindings.length,
         loggingFindings:  loggingFindings.length,
         durationMs:       elapsed,
->>>>>>> cba3e430cf510341d77a07e89dcdee06e8c99cfe
       },
     };
   }

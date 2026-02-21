@@ -40,6 +40,23 @@ const scanSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  // 'extension' for VS Code extension uploads, 'dashboard' for web-initiated scans
+  source: {
+    type: String,
+    enum: ['extension', 'dashboard'],
+    default: 'dashboard',
+    index: true,
+  },
+  // Absolute file-system path (extension scans only)
+  targetPath: {
+    type: String,
+    default: null,
+  },
+  // Full HTML report body (extension scans only)
+  htmlReport: {
+    type: String,
+    default: null,
+  },
   status: {
     type: String,
     enum: ['running', 'completed', 'failed'],

@@ -431,7 +431,18 @@ async function runScan(targetPath, context) {
         ).toString();
         const htmlWithLogo = diskHtml.replace(/\{\{LOGO_SRC\}\}/g, logoUri);
         setPanelReport(panel, htmlWithLogo, 'ZeroTrace Report');
-        uploadReportToDashboard(context, { htmlReport: htmlWithLogo, targetPath, summary: {} });
+        // Try to load real summary from the co-located JSON report
+        const diskSummary = result.htmlPath
+          ? readJsonSummary(result.htmlPath)
+          : (() => {
+              const dirs = findZeroTraceDirs(targetPath);
+              for (const d of dirs) {
+                const h = findLatestHtmlInDir(d);
+                if (h) { const s = readJsonSummary(h); if (s) return s; }
+              }
+              return null;
+            })();
+        uploadReportToDashboard(context, { htmlReport: htmlWithLogo, targetPath, summary: diskSummary || {} });
       } else {
         panel.webview.html = getErrorHtml(panel.webview, context, 'Report generation failed. Check the ZeroTrace output console.');
       }
@@ -453,6 +464,27 @@ async function runScan(targetPath, context) {
 }
 
 // ─── Helpers: find .zerotrace HTML reports on disk ────────────────────────────
+
+/**
+ * Try to read the summary object from the zerotrace-report.json that lives
+ * in the same directory as the given HTML file.
+ * Returns the summary object if found, or null.
+ */
+function readJsonSummary(htmlFilePath) {
+  try {
+    const dir      = path.dirname(htmlFilePath);
+    const jsonPath = path.join(dir, 'zerotrace-report.json');
+    if (!fs.existsSync(jsonPath)) return null;
+    const report = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
+    const s = report?.summary;
+    if (!s) return null;
+    console.log(`[ZeroTrace] Loaded summary from ${jsonPath}: ${s.totalFindings} findings, ${s.riskLevel}`);
+    return s;
+  } catch (e) {
+    console.warn('[ZeroTrace] Could not read JSON summary:', e.message);
+    return null;
+  }
+}
 
 /**
  * Return the path to the newest .html file inside `dir`, or null if none found.
@@ -654,7 +686,8 @@ function activate(context) {
       });
       if (!uris || uris.length === 0) return;
       const htmlReport = fs.readFileSync(uris[0].fsPath, 'utf8');
-      await uploadReportToDashboard(context, { htmlReport, targetPath: uris[0].fsPath, summary: {} });
+      const pickerSummary = readJsonSummary(uris[0].fsPath);
+      await uploadReportToDashboard(context, { htmlReport, targetPath: uris[0].fsPath, summary: pickerSummary || {} });
       return;
     }
 
@@ -695,10 +728,11 @@ function activate(context) {
     catch (e) { vscode.window.showErrorMessage(`ZeroTrace: Failed to read file — ${e.message}`); return; }
 
     console.log(`[ZeroTrace] Upload: ${chosen} (${fileSizeKB} KB)`);
+    const chosenSummary = readJsonSummary(chosen);
     const saved = await uploadReportToDashboard(context, {
       htmlReport,
       targetPath: chosen,
-      summary: { riskLevel: 'UNKNOWN', totalFindings: 0 },
+      summary: chosenSummary || { riskLevel: 'UNKNOWN', totalFindings: 0 },
     });
     if (saved) {
       vscode.window.showInformationMessage(`ZeroTrace: "${path.basename(chosen)}" saved to dashboard ✓`);
