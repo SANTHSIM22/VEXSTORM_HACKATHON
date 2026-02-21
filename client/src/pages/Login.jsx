@@ -3,21 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { CheckCircle2, AlertTriangle, Eye, EyeOff, ArrowRight } from "lucide-react";
 
-/* ── Zero Trace Logo ── */
-const ZeroTraceLogo = ({ size = 22 }) => (
-  <svg width={size} height={size} viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="16" cy="16" r="12" stroke="url(#zt-grad-login)" strokeWidth="2.5" fill="none" />
-    <circle cx="16" cy="16" r="7" stroke="url(#zt-grad-login)" strokeWidth="1.5" fill="none" opacity="0.5" />
-    <line x1="6" y1="26" x2="26" y2="6" stroke="url(#zt-grad-login)" strokeWidth="2" strokeLinecap="round" />
-    <circle cx="16" cy="16" r="2.5" fill="url(#zt-grad-login)" />
-    <defs>
-      <linearGradient id="zt-grad-login" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#a855f7" />
-        <stop offset="100%" stopColor="#e9d5ff" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
 
 /* ── Glass styles ── */
 const glass = {
@@ -69,8 +54,8 @@ const Login = () => {
 
         <div className="relative">
           <Link to="/" className="flex items-center gap-2.5 text-white no-underline mb-16">
-            <ZeroTraceLogo size={28} />
-            <span className="text-xl font-extrabold tracking-widest text-[#F9FAFB]">
+            <img src="/logo.png" width={28} height={28} alt="Zero Trace" className="object-contain" />
+            <span className="brand-name text-xs text-[#F9FAFB]">
               ZERO<span className="bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent">TRACE</span>
             </span>
           </Link>
@@ -117,8 +102,8 @@ const Login = () => {
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md">
           <Link to="/" className="flex lg:hidden items-center gap-2.5 text-white no-underline mb-10 justify-center">
-            <ZeroTraceLogo size={24} />
-            <span className="text-lg font-extrabold tracking-widest text-[#F9FAFB]">
+            <img src="/logo.png" width={24} height={24} alt="Zero Trace" className="object-contain" />
+            <span className="brand-name text-xs text-[#F9FAFB]">
               ZERO<span className="bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent">TRACE</span>
             </span>
           </Link>
