@@ -109,3 +109,7 @@ coverage/
 .tmp/
 tmp/
 temp/
+
+# ZeroTrace scan output (may contain secrets found in scanned code)
+test/.zerotrace/
+**/.zerotrace/
