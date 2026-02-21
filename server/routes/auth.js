@@ -1,7 +1,7 @@
-import express from 'express';
-import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
-import { protect } from '../middleware/auth.js';
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -77,4 +77,4 @@ router.get('/me', protect, async (req, res) => {
   res.json({ user: req.user });
 });
 
-export default router;
+module.exports = router;

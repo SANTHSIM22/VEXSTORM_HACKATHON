@@ -1,9 +1,10 @@
-import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
-import mongoose from 'mongoose';
-import authRoutes from './routes/auth.js';
-import userRoutes from './routes/user.js';
+require('dotenv/config');
+const express = require('express');
+const cors = require('cors');
+const mongoose = require('mongoose');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/user');
+const scanRoutes = require('./routes/scans');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,6 +19,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/scans', scanRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
@@ -37,4 +39,4 @@ mongoose.connect(process.env.MONGO_URI)
     process.exit(1);
   });
 
-export default app;
+module.exports = app;
