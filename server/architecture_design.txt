@@ -1,0 +1,76 @@
+# VulnSight-AI Server System Architecture Design
+
+## 1. Overview
+VulnSight-AI is an agentic, AI-powered web vulnerability scanner. It utilizes an orchestrated multi-agent system to automate security reconnaissance, vulnerability detection, risk assessment, and remediation planning.
+
+## 2. Component Architecture
+
+### 2.1 Entry Points
+- CLI (main.js): A command-line interface for direct interaction.
+- API Server (server.js): An Express.js REST API for remote scan management (e.g., POST /scan).
+
+### 2.2 Orchestration Layer (orchestrator/orchestrator.js)
+The Orchestrator manages the scan lifecycle across six distinct phases:
+1. Reconnaissance: Surface mapping and discovery.
+2. AI-Powered Planning: Using LLM to prioritize the attack surface.
+3. Vulnerability Scanning: Sequential execution of specialized agents.
+4. Risk Scoring (RiskEngine): Calculating severity for each finding.
+5. AI-Powered Remediation: Generating fix recommendations.
+6. Reporting: Aggregating all results into structured reports.
+
+### 2.3 Agentic System (agents/)
+A modular system of specialized agents, all inheriting from a BaseAgent:
+- ReconAgent: Crawls URLs, analyzes forms, and identifies API endpoints.
+- PlannerAgent: Consults the LLM to create a targeted scan strategy.
+- Vulnerability Agents:
+  - InjectionAgent: SQLi, NoSQLi, Command Injection testing.
+  - XSSAgent: Cross-Site Scripting detection via payload fuzzing.
+  - AuthAgent: Broken Authentication checks.
+  - ConfigAgent: Security misconfiguration checks.
+  - SSRFAgent: Server-Side Request Forgery testing.
+  - PathTraversalAgent: Directory traversal checks.
+  - [Other agents: Dependency, AccessControl, Crypto, Integrity, Logging, BusinessLogic]
+- RemediationAgent: Generates tailored code fixes for discovered vulnerabilities.
+
+### 2.4 Intelligence & State (intelligence/)
+- FindingsStore: A thread-safe repository for all security findings.
+- ScanMemory: Tracks scan state, attack surface, and performance metrics.
+
+### 2.5 AI & LLM Engine (llm/)
+- mistralClient.js: Interface for Mistral AI services.
+- Responsibilities:
+  - Dynamic payload generation based on target context.
+  - Strategy reasoning and prioritization.
+  - Context-aware remediation code generation.
+
+### 2.6 Analytical Engines (engine/)
+- RiskEngine: Enriches findings with severity scores and CVSS-like metrics.
+- ValidationEngine: (Placeholder/Planned) for confirming low-confidence findings.
+
+### 2.7 Tooling & Utilities (tools/ & utils/)
+- Tools: Crawler, FormAnalyzer, HeaderAnalyzer, DiffEngine.
+- Utils: HttpClient (with rate limiting), Logger (scan-specific file logging), URLHelper.
+
+## 3. Data Flow
+1. User provides Target URL -> main.js/server.js.
+2. Orchestrator initializes ScanMemory and Logger.
+3. ReconAgent populates the Attack Surface in ScanMemory.
+4. PlannerAgent/LLM generates a Strategy.
+5. Vulnerability Agents execute sequentially, storing results in FindingsStore.
+6. RiskEngine scores the findings.
+7. RemediationAgent/LLM generates fix guides.
+8. ReportGenerator creates JSON/Markdown/PDF outputs in the scan-specific folder.
+
+## 4. File Structure (Server Folder)
+- server.js (API Entry)
+- main.js (CLI Entry)
+- config.js (Environment & System Config)
+- agents/ (Logic for individual security tests)
+- orchestrator/ (Master control logic)
+- engine/ (Risk calculation & validation)
+- llm/ (AI Client & prompts)
+- intelligence/ (Memory & Findings management)
+- reporting/ (Report templates & generation)
+- tools/ (Crawlers & analyzers)
+- utils/ (Core infrastructure)
+- scans/ (Storage for reports and scan logs)
