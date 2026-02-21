@@ -765,9 +765,9 @@ const Landing = () => {
             { x: 25, y: 48 },  // AUTH — mid-left
             { x: 82, y: 72 },  // BIZ LOGIC — bottom-right
             { x: 62, y: 22 },  // API SEC — top-center-right
-            { x: 32, y: 76 },  // FRONTEND — bottom-left
+            { x: 11, y: 76 },  // FRONTEND — bottom-left
             { x: 90, y: 45 },  // INFRA — mid-right
-            { x: 55, y: 67 },  // CRYPTO — center-bottom
+            { x: 55, y: 72 },  // CRYPTO — center-bottom
             { x: 28, y: 13 },  // AI DEEP — upper-left area
             { x: 68, y: 48 },  // VERIFY — right
           ];
