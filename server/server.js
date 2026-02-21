@@ -4,7 +4,6 @@ const Logger = require('./utils/logger');
 const FindingsStore = require('./intelligence/findingsStore');
 const ScanMemory = require('./intelligence/memory');
 const Orchestrator = require('./orchestrator/orchestrator');
-const { createScanFolder, generateReport } = require('./reporting/reportGenerator');
 
 validateConfig();
 
@@ -33,10 +32,9 @@ app.post('/scan', async (req, res) => {
         return res.status(400).json({ error: 'baseURL is required' });
     }
 
-    const scanFolder = createScanFolder();
-    const logger = new Logger(scanFolder);
+    const logger = new Logger(null);
     const findingsStore = new FindingsStore();
-    const memory = new ScanMemory(baseURL, { scanFolder, depth, mode });
+    const memory = new ScanMemory(baseURL, { depth, mode });
 
     logger.info(`API scan started for: ${baseURL}`);
 
@@ -52,13 +50,10 @@ app.post('/scan', async (req, res) => {
     try {
         const orchestrator = new Orchestrator(logger, memory, findingsStore);
         const report = await orchestrator.run(baseURL);
-        const { jsonPath, mdPath } = await generateReport(scanFolder, baseURL, report);
 
         scanResults[memory.scanId] = {
             status: 'completed',
             report,
-            jsonPath,
-            mdPath,
             completedAt: new Date().toISOString(),
         };
     } catch (err) {

@@ -4,13 +4,16 @@ const puppeteer = require('puppeteer-core');
 const { marked } = require('marked');
 
 function createScanFolder() {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const scanFolder = path.join(__dirname, '..', 'scans', `scan-${timestamp}`);
-    fs.mkdirSync(scanFolder, { recursive: true });
-    return scanFolder;
+    // Scan folder creation disabled
+    return null;
 }
 
 async function generateReport(scanFolder, target, report) {
+    // File-based reporting disabled — data is stored in DB/memory
+    if (!scanFolder) {
+        return { jsonPath: null, mdPath: null, pdfPath: null };
+    }
+
     // Save JSON report
     const jsonPath = path.join(scanFolder, 'report.json');
     fs.writeFileSync(jsonPath, JSON.stringify(report, null, 2));

@@ -8,7 +8,7 @@ import {
   Loader2, AlertCircle, RefreshCw, FileText, ScrollText,
   Radio, Shield, Zap, Bug, Lock, Settings, Globe, Key,
   Package, Database, Activity, Layers, Clock, Cpu, Eye,
-  AlertTriangle, Wrench, FlaskConical, Info
+  AlertTriangle, Wrench, FlaskConical, Info, Github, GitBranch
 } from "lucide-react";
 
 
@@ -76,6 +76,7 @@ const NAV = [
   { id: "report",          icon: <FileText size={18} />,        label: "Full Report" },
   { id: "agents",          icon: <Terminal size={18} />,        label: "Agent Logs" },
   { id: "extension",       icon: <ScrollText size={18} />,     label: "Extension Reports" },
+  { id: "github",          icon: <Github size={18} />,          label: "GitHub Scan" },
 ];
 
 /* ── Markdown renderer (handles fenced code blocks + bold) ── */
@@ -178,6 +179,18 @@ const Dashboard = () => {
   const [extReportHtmlLoading, setExtReportHtmlLoading] = useState(false);
   const [deletingExtReport, setDeletingExtReport] = useState(null); // scanId being deleted
 
+  /* ── GitHub scan state ── */
+  const [githubUrl, setGithubUrl]                 = useState("");
+  const [githubBranch, setGithubBranch]           = useState("");
+  const [githubToken, setGithubToken]             = useState("");
+  const [githubScans, setGithubScans]             = useState([]);
+  const [githubScansLoading, setGithubScansLoading] = useState(false);
+  const [selectedGithubScan, setSelectedGithubScan] = useState(null); // { meta, html }
+  const [githubHtmlLoading, setGithubHtmlLoading] = useState(false);
+  const [githubScanSubmitting, setGithubScanSubmitting] = useState(false);
+  const [activeGithubScanId, setActiveGithubScanId] = useState(null);
+  const [deletingGithubScan, setDeletingGithubScan] = useState(null);
+
   /* ── Scan form state ── */
   const [repoUrl, setRepoUrl] = useState("");
   const [scanSubmitting, setScanSubmitting] = useState(false);
@@ -248,6 +261,107 @@ const Dashboard = () => {
       setExtReportHtmlLoading(false);
     }
   }, []);
+
+  /* ── GitHub Scan handlers ── */
+  const fetchGithubScans = useCallback(async () => {
+    setGithubScansLoading(true);
+    try {
+      const res = await api.get("/github/scans");
+      setGithubScans(res.data);
+    } catch (err) {
+      if (err.response?.status !== 401) setError("Failed to load GitHub scans");
+    } finally {
+      setGithubScansLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (tab === "github") fetchGithubScans();
+  }, [tab, fetchGithubScans]);
+
+  /* Poll active GitHub scan every 3 s */
+  useEffect(() => {
+    if (!activeGithubScanId) return;
+    const poll = async () => {
+      try {
+        const res = await api.get(`/github/scans/${activeGithubScanId}`);
+        setGithubScans((prev) =>
+          prev.map((s) => s.scanId === activeGithubScanId ? { ...s, ...res.data } : s)
+        );
+        if (selectedGithubScan?.meta?.scanId === activeGithubScanId) {
+          setSelectedGithubScan((prev) => prev ? { ...prev, meta: { ...prev.meta, ...res.data }, liveLogs: res.data.liveLogs } : prev);
+        }
+        if (res.data.status !== "running") {
+          setActiveGithubScanId(null);
+          fetchGithubScans();
+        }
+      } catch { /* silent */ }
+    };
+    poll();
+    const id = setInterval(poll, 3000);
+    return () => clearInterval(id);
+  }, [activeGithubScanId, fetchGithubScans, selectedGithubScan]);
+
+  const handleGithubScan = async (e) => {
+    e.preventDefault();
+    if (!githubUrl.trim() || githubScanSubmitting) return;
+    setError("");
+    setGithubScanSubmitting(true);
+    try {
+      const res = await api.post("/github/scan", {
+        repoUrl:     githubUrl.trim(),
+        branch:      githubBranch.trim() || undefined,
+        githubToken: githubToken.trim() || undefined,
+      });
+      const { scanId, createdAt } = res.data;
+      setActiveGithubScanId(scanId);
+      setGithubScans((prev) => [{
+        scanId, repoUrl: githubUrl.trim(), branch: githubBranch.trim() || null,
+        status: "running", createdAt, vulnerabilityCount: 0, riskScore: 0,
+        bySeverity: { critical: 0, high: 0, medium: 0, low: 0, info: 0 },
+      }, ...prev]);
+      setSelectedGithubScan({ meta: { scanId, repoUrl: githubUrl.trim(), status: "running", createdAt }, html: null, liveLogs: [] });
+      setGithubUrl("");
+      setGithubBranch("");
+      setGithubToken("");
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to start GitHub scan");
+    } finally {
+      setGithubScanSubmitting(false);
+    }
+  };
+
+  const selectGithubScan = useCallback(async (meta) => {
+    setSelectedGithubScan({ meta, html: null });
+    if (meta.status !== "completed") return;
+    setGithubHtmlLoading(true);
+    try {
+      const res = await api.get(`/github/scans/${meta.scanId}/html`, {
+        responseType: "text",
+        transformResponse: [(d) => d],
+      });
+      setSelectedGithubScan({ meta, html: res.data });
+    } catch {
+      setError("Failed to load GitHub scan HTML report");
+    } finally {
+      setGithubHtmlLoading(false);
+    }
+  }, []);
+
+  const deleteGithubScan = useCallback(async (scanId, e) => {
+    e.stopPropagation();
+    if (!window.confirm("Delete this GitHub scan report? This cannot be undone.")) return;
+    setDeletingGithubScan(scanId);
+    try {
+      await api.delete(`/github/scans/${scanId}`);
+      setGithubScans((prev) => prev.filter((s) => s.scanId !== scanId));
+      if (selectedGithubScan?.meta?.scanId === scanId) setSelectedGithubScan(null);
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to delete scan");
+    } finally {
+      setDeletingGithubScan(null);
+    }
+  }, [selectedGithubScan]);
 
   /* ── Select a scan (load full details) ── */
   const selectScan = useCallback(async (scanId) => {
@@ -491,7 +605,7 @@ const Dashboard = () => {
         <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#a855f7]/60 px-3 mb-2 font-mono">Report</div>
         <nav className="flex-1 space-y-0.5">
           {NAV.map((item, idx) => {
-            const sectionBreaks = { vulnerabilities: "Analysis", extension: "Findings" };
+            const sectionBreaks = { vulnerabilities: "Analysis", extension: "Findings", github: "GitHub" };
             return (
               <div key={item.id}>
                 {sectionBreaks[item.id] && (
@@ -554,6 +668,7 @@ const Dashboard = () => {
            
               {tab === "agents" && "Agent Activity Logs"}
               {tab === "extension" && "Extension Reports"}
+              {tab === "github" && "GitHub Repository Scanner"}
             </h1>
             <p className="text-[#a78bfa]/60 text-sm">
               Welcome back, <span className="text-[#f3e8ff] font-medium">{user?.name}</span>
@@ -2187,6 +2302,282 @@ const Dashboard = () => {
                       ) : (
                         <div className="flex items-center justify-center h-full text-sm text-red-400">
                           Report HTML is empty.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── GITHUB SCAN TAB ── */}
+        {tab === "github" && (
+          <div className="space-y-6">
+            {/* ── Scan Form ── */}
+            <div className="rounded-2xl p-6" style={glass}>
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                  style={{ background: "rgba(124,58,237,0.2)", border: "1px solid rgba(124,58,237,0.3)" }}>
+                  <Github size={18} className="text-[#A78BFA]" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[#F9FAFB]">Scan a GitHub Repository</h2>
+                  <p className="text-xs text-[#94A3B8]">Multi-agent AI security analysis — pattern scan + Mistral AI deep analysis + HTML report</p>
+                </div>
+              </div>
+              <form onSubmit={handleGithubScan} className="space-y-4">
+                {/* Repo URL */}
+                <div>
+                  <label className="block text-xs font-semibold text-[#94A3B8] mb-1.5 uppercase tracking-wider">
+                    GitHub Repository URL <span className="text-red-400">*</span>
+                  </label>
+                  <div className="relative">
+                    <Globe size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#475569]" />
+                    <input
+                      type="text"
+                      value={githubUrl}
+                      onChange={(e) => setGithubUrl(e.target.value)}
+                      placeholder="https://github.com/owner/repo"
+                      required
+                      className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm text-[#F9FAFB] placeholder-[#475569] outline-none focus:ring-1 focus:ring-[#7C3AED]/50 transition-all"
+                      style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(168,85,247,0.2)" }}
+                    />
+                  </div>
+                </div>
+                {/* Branch + Token (optional) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-[#94A3B8] mb-1.5 uppercase tracking-wider">
+                      Branch <span className="text-[#475569] font-normal">(optional)</span>
+                    </label>
+                    <div className="relative">
+                      <GitBranch size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#475569]" />
+                      <input
+                        type="text"
+                        value={githubBranch}
+                        onChange={(e) => setGithubBranch(e.target.value)}
+                        placeholder="main"
+                        className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm text-[#F9FAFB] placeholder-[#475569] outline-none focus:ring-1 focus:ring-[#7C3AED]/50 transition-all"
+                        style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(168,85,247,0.2)" }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[#94A3B8] mb-1.5 uppercase tracking-wider">
+                      GitHub Token <span className="text-[#475569] font-normal">(private repos)</span>
+                    </label>
+                    <div className="relative">
+                      <Key size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#475569]" />
+                      <input
+                        type="password"
+                        value={githubToken}
+                        onChange={(e) => setGithubToken(e.target.value)}
+                        placeholder="ghp_xxxxxxxxxxxx"
+                        className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm text-[#F9FAFB] placeholder-[#475569] outline-none focus:ring-1 focus:ring-[#7C3AED]/50 transition-all"
+                        style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(168,85,247,0.2)" }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={!githubUrl.trim() || githubScanSubmitting}
+                  className="w-full py-3 rounded-xl text-sm font-bold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  style={{ background: "linear-gradient(135deg, #7C3AED, #3B82F6)", boxShadow: "0 4px 20px rgba(124,58,237,0.35)" }}
+                >
+                  {githubScanSubmitting ? (
+                    <><Loader2 size={16} className="animate-spin" /> Initializing scan...</>
+                  ) : (
+                    <><Github size={16} /> Scan Repository</>
+                  )}
+                </button>
+              </form>
+            </div>
+
+            {/* ── Scan List + Viewer ── */}
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-[#94A3B8]">Your GitHub repository scans</p>
+              <button
+                onClick={fetchGithubScans}
+                disabled={githubScansLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50"
+                style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)", color: "#A78BFA" }}
+              >
+                <RefreshCw size={13} className={githubScansLoading ? "animate-spin" : ""} />
+                Refresh
+              </button>
+            </div>
+
+            {githubScansLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 size={36} className="animate-spin text-[#7C3AED]" />
+              </div>
+            ) : githubScans.length === 0 ? (
+              <div className="p-12 rounded-xl text-center" style={glass}>
+                <Github size={48} className="mx-auto mb-4 text-[#94A3B8]/40" />
+                <p className="text-[#94A3B8] mb-2">No GitHub scans yet.</p>
+                <p className="text-xs text-[#475569]">Enter a GitHub repository URL above to start a security scan.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                {/* ── Scan list ── */}
+                <div className="lg:col-span-1 space-y-2">
+                  {githubScans.map((s) => {
+                    const risk       = riskLabel(s.riskScore);
+                    const isSelected = selectedGithubScan?.meta?.scanId === s.scanId;
+                    const isRunning  = s.status === "running";
+                    const isFailed   = s.status === "failed";
+                    return (
+                      <div
+                        key={s.scanId}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => selectGithubScan(s)}
+                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") selectGithubScan(s); }}
+                        className="w-full text-left px-4 py-3.5 rounded-xl transition-all duration-200 cursor-pointer"
+                        style={{
+                          background: isSelected ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.04)",
+                          border: isSelected ? "1px solid rgba(124,58,237,0.35)" : "1px solid rgba(255,255,255,0.06)",
+                        }}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          {isRunning ? (
+                            <span className="flex items-center gap-1.5 text-xs text-[#A78BFA] font-semibold">
+                              <Loader2 size={11} className="animate-spin" /> Scanning...
+                            </span>
+                          ) : isFailed ? (
+                            <span className="text-xs text-red-400 font-semibold">Failed</span>
+                          ) : (
+                            <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${risk.bg} ${risk.color}`}>
+                              {risk.label}
+                            </span>
+                          )}
+                          <span className="text-xs text-[#475569]">{timeAgo(s.createdAt)}</span>
+                        </div>
+                        <div className="text-sm text-[#F9FAFB] font-mono truncate flex items-center gap-1.5">
+                          <Github size={12} className="text-[#7C3AED] shrink-0" />
+                          {(s.repoUrl || "").replace("https://github.com/", "")}
+                        </div>
+                        {s.branch && (
+                          <div className="flex items-center gap-1 text-xs text-[#475569] mt-0.5">
+                            <GitBranch size={10} /> {s.branch}
+                          </div>
+                        )}
+                        {isRunning && s.progressMessage && (
+                          <div className="text-xs text-[#A78BFA] mt-1 truncate">{s.progressMessage}</div>
+                        )}
+                        {!isRunning && !isFailed && (
+                          <div className="flex gap-3 mt-2 text-xs text-[#94A3B8]">
+                            <span className="text-red-400 font-semibold">{s.bySeverity?.critical ?? 0} crit</span>
+                            <span className="text-orange-400 font-semibold">{s.bySeverity?.high ?? 0} high</span>
+                            <span className="text-yellow-400 font-semibold">{s.bySeverity?.medium ?? 0} med</span>
+                            <span className="ml-auto">{s.vulnerabilityCount} total</span>
+                          </div>
+                        )}
+                        <button
+                          onClick={(e) => deleteGithubScan(s.scanId, e)}
+                          disabled={deletingGithubScan === s.scanId}
+                          title="Delete scan"
+                          className="mt-1 text-[#475569] hover:text-red-400 transition-colors disabled:opacity-40 text-xs"
+                        >
+                          {deletingGithubScan === s.scanId ? "…" : "🗑"}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* ── Report viewer ── */}
+                <div className="lg:col-span-2">
+                  {!selectedGithubScan ? (
+                    <div className="flex items-center justify-center h-full min-h-[400px] rounded-xl" style={glass}>
+                      <div className="text-center">
+                        <Github size={40} className="mx-auto mb-3 text-[#94A3B8]/40" />
+                        <p className="text-sm text-[#94A3B8]">Select a scan to view the report</p>
+                      </div>
+                    </div>
+                  ) : selectedGithubScan.meta?.status === "running" ? (
+                    /* Live progress panel */
+                    <div className="rounded-2xl p-6 min-h-[400px]" style={glass}>
+                      <div className="flex items-center gap-3 mb-6">
+                        <Loader2 size={20} className="animate-spin text-[#7C3AED]" />
+                        <div>
+                          <div className="text-sm font-bold text-[#F9FAFB]">Scan in progress...</div>
+                          <div className="text-xs text-[#94A3B8]">
+                            {selectedGithubScan.meta?.progressMessage || selectedGithubScan.liveLogs?.slice(-1)[0] || "Initializing..."}
+                          </div>
+                        </div>
+                      </div>
+                      {/* Stage indicator */}
+                      {selectedGithubScan.meta?.currentStage && (
+                        <div className="mb-4 px-3 py-2 rounded-lg text-xs font-mono text-[#A78BFA]"
+                          style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.2)" }}>
+                          Stage: {selectedGithubScan.meta.currentStage}
+                        </div>
+                      )}
+                      {/* Live logs */}
+                      <div className="rounded-xl p-3 max-h-64 overflow-y-auto font-mono text-[10px] space-y-0.5"
+                        style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        {(selectedGithubScan.liveLogs || []).length === 0 ? (
+                          <div className="text-[#475569]">Waiting for logs...</div>
+                        ) : (
+                          (selectedGithubScan.liveLogs || []).map((l, i) => (
+                            <div key={i} className="text-[#94A3B8] leading-relaxed">{l}</div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  ) : selectedGithubScan.meta?.status === "failed" ? (
+                    <div className="flex flex-col items-center justify-center h-full min-h-[400px] rounded-xl" style={glass}>
+                      <AlertCircle size={40} className="mb-3 text-red-400" />
+                      <p className="text-sm text-red-400 font-semibold">Scan Failed</p>
+                      <p className="text-xs text-[#94A3B8] mt-1">
+                        {(selectedGithubScan.meta?.errors || [])[0] || "Unknown error occurred"}
+                      </p>
+                    </div>
+                  ) : githubHtmlLoading ? (
+                    <div className="flex items-center justify-center h-full min-h-[400px] rounded-xl" style={glass}>
+                      <Loader2 size={32} className="animate-spin text-[#7C3AED]" />
+                    </div>
+                  ) : (
+                    <div className="rounded-xl overflow-hidden" style={{ ...glass, height: "75vh" }}>
+                      {/* Toolbar */}
+                      <div
+                        className="flex items-center gap-3 px-5 py-3 shrink-0"
+                        style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.02)" }}
+                      >
+                        <Github size={15} className="text-[#7C3AED]" />
+                        <span className="text-sm font-medium text-[#F9FAFB] truncate flex-1 font-mono">
+                          {(selectedGithubScan.meta?.repoUrl || "").replace("https://github.com/", "")}
+                        </span>
+                        <span className="text-xs text-[#94A3B8]">{timeAgo(selectedGithubScan.meta?.createdAt)}</span>
+                        <a
+                          href={`${import.meta.env.VITE_API_URL ?? "http://localhost:5000/api"}/github/scans/${selectedGithubScan.meta?.scanId}/html?token=${encodeURIComponent(localStorage.getItem("vexstorm_token") ?? "")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs px-3 py-1 rounded-lg font-semibold transition-colors cursor-pointer text-[#A78BFA] hover:text-white"
+                          style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)" }}
+                        >
+                          Open full page ↗
+                        </a>
+                      </div>
+                      {/* iframe */}
+                      {selectedGithubScan.html ? (
+                        <iframe
+                          title="GitHub Security Scan Report"
+                          srcDoc={selectedGithubScan.html}
+                          sandbox="allow-scripts allow-same-origin"
+                          className="w-full border-0"
+                          style={{ height: "calc(75vh - 48px)" }}
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-sm text-[#94A3B8]">
+                          <div className="text-center">
+                            <FileText size={32} className="mx-auto mb-2 opacity-40" />
+                            <p>Select a completed scan to view the HTML report</p>
+                          </div>
                         </div>
                       )}
                     </div>

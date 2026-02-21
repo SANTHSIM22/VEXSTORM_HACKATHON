@@ -11,7 +11,6 @@ const Orchestrator = require('../orchestrator/orchestrator');
 const FindingsStore = require('../intelligence/findingsStore');
 const ScanMemory = require('../intelligence/memory');
 const Logger = require('../utils/logger');
-const { createScanFolder, generateReport } = require('../reporting/reportGenerator');
 const Scan = require('../models/Scan');
 const User = require('../models/User');
 
@@ -177,13 +176,10 @@ router.get('/:scanId/logs', protect, async (req, res) => {
 // Background scan runner
 // ──────────────────────────────────────────────
 async function runScan(entry, targetUrl, scanType, userId) {
-  let scanFolder;
   try {
-    scanFolder = createScanFolder();
-    const logger = new Logger(scanFolder);
+    const logger = new Logger(null);
     const findingsStore = new FindingsStore();
     const memory = new ScanMemory(targetUrl, {
-      scanFolder,
       scanType: scanType || 'full',
     });
 
@@ -197,8 +193,7 @@ async function runScan(entry, targetUrl, scanType, userId) {
     const orchestrator = new Orchestrator(logger, memory, findingsStore, entry);
     const report = await orchestrator.run(targetUrl);
 
-    // Generate file reports
-    await generateReport(scanFolder, targetUrl, report);
+    // File report generation disabled
 
     // Populate registry entry with final results
     entry.status = 'completed';
