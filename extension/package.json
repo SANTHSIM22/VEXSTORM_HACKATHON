@@ -1,6 +1,6 @@
 {
   "name": "vulentry",
-  "publisher": "vexstorm",
+  "publisher": "santhsim",
   "displayName": "vulentry",
   "description": "Multi-agent AI Security Scanner powered by LangGraph + Mistral",
   "version": "0.0.1",

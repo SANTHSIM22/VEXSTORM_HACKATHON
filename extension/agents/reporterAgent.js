@@ -122,6 +122,15 @@ Keep it professional and actionable. Max 400 words.`;
       (!f.source) // untagged LLM findings
     );
 
+    // Pull specialist agent findings
+    const authFindings     = options.authResults?.authFindings     || [];
+    const bizFindings      = options.bizResults?.bizFindings       || [];
+    const apiFindings      = options.apiResults?.apiFindings       || [];
+    const frontendFindings = options.frontendResults?.frontendFindings || [];
+    const infraFindings    = options.infraResults?.infraFindings   || [];
+    const cryptoFindings   = options.cryptoResults?.cryptoFindings  || [];
+    const loggingFindings  = options.cryptoResults?.loggingFindings || [];
+
     // Build structured JSON report
     const reportJson = JSON.parse(await buildReportTool.invoke({
       targetPath:      scannerResult ? scannerResult.allFiles?.[0]?.filePath?.split(/[\\/]test[\\/]/)[0] || 'Unknown' : 'Unknown',
@@ -130,6 +139,13 @@ Keep it professional and actionable. Max 400 words.`;
       astFindings,
       depFindings,
       llmFindings,
+      authFindings,
+      bizFindings,
+      apiFindings,
+      frontendFindings,
+      infraFindings,
+      cryptoFindings,
+      loggingFindings,
       agentLogs: allAgentLogs,
       scanDurationMs: Date.now() - t0,
     }));
@@ -138,19 +154,9 @@ Keep it professional and actionable. Max 400 words.`;
     const executiveSummary = await this.generateExecutiveSummary(reportJson);
     reportJson.executiveSummary = executiveSummary;
 
-    // Render HTML
+    // Render HTML (executive summary is embedded by renderHtmlReportTool via r.executiveSummary)
     this.log('Rendering HTML report...');
-    let htmlReport = await renderHtmlReportTool.invoke({ report: reportJson });
-
-    // Inject executive summary into HTML
-    htmlReport = htmlReport.replace(
-      '<div class="container">',
-      `<div class="container">
-  <div class="section" style="margin-bottom:28px">
-    <div class="section-header"><h2>📝 Executive Summary</h2></div>
-    <div style="padding:20px;line-height:1.8;white-space:pre-wrap;font-size:14px;color:#374151">${executiveSummary}</div>
-  </div>`
-    );
+    const htmlReport = await renderHtmlReportTool.invoke({ report: reportJson });
 
     // Save reports if output dir provided
     let jsonPath = null;

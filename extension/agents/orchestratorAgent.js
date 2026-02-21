@@ -38,6 +38,12 @@ const PatternAnalysisAgent = require('./patternAnalysisAgent');
 const LLMAnalyzerAgent     = require('./llmAnalyzerAgent');
 const VerifierAgent        = require('./verifierAgent');
 const ReporterAgent        = require('./reporterAgent');
+const AuthSecurityAgent    = require('./authSecurityAgent');
+const BusinessLogicAgent   = require('./businessLogicAgent');
+const ApiSecurityAgent     = require('./apiSecurityAgent');
+const FrontendSecurityAgent = require('./frontendSecurityAgent');
+const InfrastructureAgent  = require('./infrastructureAgent');
+const CryptoLoggingAgent   = require('./cryptoLoggingAgent');
 
 // ─── State definition using LangGraph Annotation ─────────────────────────────
 const SecurityScanState = Annotation.Root({
@@ -56,6 +62,14 @@ const SecurityScanState = Annotation.Root({
   llmResults:      Annotation({ reducer: (_, y) => y, default: () => null }),
   verifierResults: Annotation({ reducer: (_, y) => y, default: () => null }),
   reportResults:   Annotation({ reducer: (_, y) => y, default: () => null }),
+
+  // Specialist agent outputs
+  authResults:     Annotation({ reducer: (_, y) => y, default: () => null }),
+  bizResults:      Annotation({ reducer: (_, y) => y, default: () => null }),
+  apiResults:      Annotation({ reducer: (_, y) => y, default: () => null }),
+  frontendResults: Annotation({ reducer: (_, y) => y, default: () => null }),
+  infraResults:    Annotation({ reducer: (_, y) => y, default: () => null }),
+  cryptoResults:   Annotation({ reducer: (_, y) => y, default: () => null }),
 
   // Accumulated logs from all agents
   agentLogs: Annotation({
@@ -134,7 +148,115 @@ function buildOrchestratorGraph() {
     }
   });
 
-  // ── Node 3: LLM Analyzer ───────────────────────────────────────────────────
+  // ── Node 3a: Auth Security ─────────────────────────────────────────────────
+  graph.addNode('authNode', async (state) => {
+    const logs = [];
+    const logger = (msg) => {
+      logs.push(`[${new Date().toISOString()}] ${msg}`);
+      state.onProgress?.({ stage: 'Auth Analysis', message: msg });
+    };
+    try {
+      const agent = new AuthSecurityAgent(logger);
+      const result = await agent.run(state.scannerResult);
+      logger(`Auth analysis done: ${result.stats?.authFindings || 0} findings`);
+      return { authResults: result, agentLogs: logs };
+    } catch (e) {
+      logs.push(`[ERROR] Auth analysis failed: ${e.message}`);
+      return { authResults: { authFindings: [] }, agentLogs: logs, errors: [e.message] };
+    }
+  });
+
+  // ── Node 3b: Business Logic ────────────────────────────────────────────────
+  graph.addNode('bizNode', async (state) => {
+    const logs = [];
+    const logger = (msg) => {
+      logs.push(`[${new Date().toISOString()}] ${msg}`);
+      state.onProgress?.({ stage: 'Business Logic Analysis', message: msg });
+    };
+    try {
+      const agent = new BusinessLogicAgent(logger);
+      const result = await agent.run(state.scannerResult);
+      logger(`Business logic done: ${result.stats?.bizFindings || 0} findings`);
+      return { bizResults: result, agentLogs: logs };
+    } catch (e) {
+      logs.push(`[ERROR] Business logic failed: ${e.message}`);
+      return { bizResults: { bizFindings: [] }, agentLogs: logs, errors: [e.message] };
+    }
+  });
+
+  // ── Node 3c: API Security ─────────────────────────────────────────────────
+  graph.addNode('apiNode', async (state) => {
+    const logs = [];
+    const logger = (msg) => {
+      logs.push(`[${new Date().toISOString()}] ${msg}`);
+      state.onProgress?.({ stage: 'API Security Analysis', message: msg });
+    };
+    try {
+      const agent = new ApiSecurityAgent(logger);
+      const result = await agent.run(state.scannerResult);
+      logger(`API security done: ${result.stats?.apiFindings || 0} findings`);
+      return { apiResults: result, agentLogs: logs };
+    } catch (e) {
+      logs.push(`[ERROR] API security failed: ${e.message}`);
+      return { apiResults: { apiFindings: [] }, agentLogs: logs, errors: [e.message] };
+    }
+  });
+
+  // ── Node 3d: Frontend Security ────────────────────────────────────────────
+  graph.addNode('frontendNode', async (state) => {
+    const logs = [];
+    const logger = (msg) => {
+      logs.push(`[${new Date().toISOString()}] ${msg}`);
+      state.onProgress?.({ stage: 'Frontend Security Analysis', message: msg });
+    };
+    try {
+      const agent = new FrontendSecurityAgent(logger);
+      const result = await agent.run(state.scannerResult);
+      logger(`Frontend security done: ${result.stats?.frontendFindings || 0} findings`);
+      return { frontendResults: result, agentLogs: logs };
+    } catch (e) {
+      logs.push(`[ERROR] Frontend security failed: ${e.message}`);
+      return { frontendResults: { frontendFindings: [] }, agentLogs: logs, errors: [e.message] };
+    }
+  });
+
+  // ── Node 3e: Infrastructure ────────────────────────────────────────────────
+  graph.addNode('infraNode', async (state) => {
+    const logs = [];
+    const logger = (msg) => {
+      logs.push(`[${new Date().toISOString()}] ${msg}`);
+      state.onProgress?.({ stage: 'Infrastructure Analysis', message: msg });
+    };
+    try {
+      const agent = new InfrastructureAgent(logger);
+      const result = await agent.run(state.scannerResult);
+      logger(`Infrastructure done: ${result.stats?.infraFindings || 0} findings`);
+      return { infraResults: result, agentLogs: logs };
+    } catch (e) {
+      logs.push(`[ERROR] Infrastructure analysis failed: ${e.message}`);
+      return { infraResults: { infraFindings: [] }, agentLogs: logs, errors: [e.message] };
+    }
+  });
+
+  // ── Node 3f: Crypto & Logging ─────────────────────────────────────────────
+  graph.addNode('cryptoNode', async (state) => {
+    const logs = [];
+    const logger = (msg) => {
+      logs.push(`[${new Date().toISOString()}] ${msg}`);
+      state.onProgress?.({ stage: 'Crypto & Logging Analysis', message: msg });
+    };
+    try {
+      const agent = new CryptoLoggingAgent(logger);
+      const result = await agent.run(state.scannerResult);
+      logger(`Crypto/Logging done: ${(result.stats?.cryptoFindings || 0) + (result.stats?.loggingFindings || 0)} findings`);
+      return { cryptoResults: result, agentLogs: logs };
+    } catch (e) {
+      logs.push(`[ERROR] Crypto/logging analysis failed: ${e.message}`);
+      return { cryptoResults: { cryptoFindings: [], loggingFindings: [] }, agentLogs: logs, errors: [e.message] };
+    }
+  });
+
+  // ── Node 4: LLM Analyzer ───────────────────────────────────────────────────
   graph.addNode('llmAnalyzer', async (state) => {
     const logs = [];
     const logger = (msg) => {
@@ -222,7 +344,15 @@ function buildOrchestratorGraph() {
         state.verifierResults,
         state.scannerResult,
         state.agentLogs,
-        { outputDir: state.options?.outputDir }
+        {
+          outputDir:       state.options?.outputDir,
+          authResults:     state.authResults,
+          bizResults:      state.bizResults,
+          apiResults:      state.apiResults,
+          frontendResults: state.frontendResults,
+          infraResults:    state.infraResults,
+          cryptoResults:   state.cryptoResults,
+        }
       );
 
       logger('Report generation complete');
@@ -241,7 +371,13 @@ function buildOrchestratorGraph() {
   // ── Edges ──────────────────────────────────────────────────────────────────
   graph.addEdge(START, 'scanner');
   graph.addEdge('scanner', 'patternAnalysis');
-  graph.addEdge('patternAnalysis', 'llmAnalyzer');
+  graph.addEdge('patternAnalysis', 'authNode');
+  graph.addEdge('authNode', 'bizNode');
+  graph.addEdge('bizNode', 'apiNode');
+  graph.addEdge('apiNode', 'frontendNode');
+  graph.addEdge('frontendNode', 'infraNode');
+  graph.addEdge('infraNode', 'cryptoNode');
+  graph.addEdge('cryptoNode', 'llmAnalyzer');
   graph.addEdge('llmAnalyzer', 'verifier');
   graph.addEdge('verifier', 'reporter');
   graph.addEdge('reporter', END);
@@ -298,6 +434,12 @@ async function runSecurityScan(config) {
       pattern:   finalState.patternResults?.stats,
       llm:       finalState.llmResults?.stats,
       verifier:  finalState.verifierResults?.stats,
+      auth:      finalState.authResults?.stats,
+      biz:       finalState.bizResults?.stats,
+      api:       finalState.apiResults?.stats,
+      frontend:  finalState.frontendResults?.stats,
+      infra:     finalState.infraResults?.stats,
+      crypto:    finalState.cryptoResults?.stats,
     },
   };
 }

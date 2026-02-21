@@ -195,6 +195,12 @@ function getLoadingHtml() {
   <div class="agents">
     <div class="agent" id="a-scanner">📁 Scanner</div>
     <div class="agent" id="a-pattern">🔎 Pattern</div>
+    <div class="agent" id="a-auth">🔑 Auth</div>
+    <div class="agent" id="a-biz">⚙️ Biz Logic</div>
+    <div class="agent" id="a-api">🌐 API</div>
+    <div class="agent" id="a-frontend">🖥️ Frontend</div>
+    <div class="agent" id="a-infra">🏗️ Infra</div>
+    <div class="agent" id="a-crypto">🔒 Crypto</div>
     <div class="agent" id="a-llm">🤖 AI Analyzer</div>
     <div class="agent" id="a-verifier">✅ Verifier</div>
     <div class="agent" id="a-reporter">📄 Reporter</div>
@@ -204,11 +210,17 @@ function getLoadingHtml() {
 
   <script>
     const stageMap = {
-      'Scanning Files':      'a-scanner',
-      'Pattern Analysis':    'a-pattern',
-      'AI Analysis':         'a-llm',
-      'Verifying Findings':  'a-verifier',
-      'Generating Report':   'a-reporter',
+      'Scanning Files':              'a-scanner',
+      'Pattern Analysis':            'a-pattern',
+      'Auth Analysis':               'a-auth',
+      'Business Logic Analysis':     'a-biz',
+      'API Security Analysis':       'a-api',
+      'Frontend Security Analysis':  'a-frontend',
+      'Infrastructure Analysis':     'a-infra',
+      'Crypto & Logging Analysis':   'a-crypto',
+      'AI Analysis':                 'a-llm',
+      'Verifying Findings':          'a-verifier',
+      'Generating Report':           'a-reporter',
     };
     let activeAgent = null;
 
