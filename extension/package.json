@@ -3,7 +3,7 @@
   "publisher": "santhsim",
   "displayName": "ZeroTrace",
   "description": "Multi-agent AI Security Scanner powered by LangGraph + Mistral",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "icon": "media/zerotrace.png",
   "engines": {
     "vscode": "^1.109.0"
@@ -24,6 +24,22 @@
       {
         "command": "zerotrace.runScanOnOpen",
         "title": "ZeroTrace: Scan Currently Open Workspace"
+      },
+      {
+        "command": "zerotrace.connectDashboard",
+        "title": "ZeroTrace: Connect to Dashboard (Sign In)"
+      },
+      {
+        "command": "zerotrace.disconnectDashboard",
+        "title": "ZeroTrace: Disconnect from Dashboard (Sign Out)"
+      },
+      {
+        "command": "zerotrace.uploadHtmlReport",
+        "title": "ZeroTrace: Upload Existing HTML Report to Dashboard"
+      },
+      {
+        "command": "zerotrace.checkDashboardStatus",
+        "title": "ZeroTrace: Check Dashboard Connection Status"
       }
     ],
     "configuration": {
@@ -69,6 +85,21 @@
             ".sh"
           ],
           "description": "File extensions to scan"
+        },
+        "zerotrace.dashboardUrl": {
+          "type": "string",
+          "default": "http://localhost:5000",
+          "description": "Base URL of the ZeroTrace dashboard backend server (e.g. http://localhost:5000)"
+        },
+        "zerotrace.dashboardEmail": {
+          "type": "string",
+          "default": "",
+          "description": "Email address used to log in to the ZeroTrace dashboard"
+        },
+        "zerotrace.dashboardPassword": {
+          "type": "string",
+          "default": "",
+          "description": "Password used to log in to the ZeroTrace dashboard (stored securely via SecretStorage)"
         }
       }
     }

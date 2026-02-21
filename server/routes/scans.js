@@ -89,6 +89,7 @@ router.get('/', protect, async (req, res) => {
       vulnerabilityCount: s.vulnerabilityCount,
       riskScore: s.riskScore,
       bySeverity: s.bySeverity,
+      source: s.source || 'web',
     })),
     ...dbOnly.map((s) => ({
       scanId: s.scanId,
@@ -99,6 +100,7 @@ router.get('/', protect, async (req, res) => {
       vulnerabilityCount: s.vulnerabilityCount,
       riskScore: s.riskScore,
       bySeverity: s.bySeverity,
+      source: s.source || 'web',
     })),
   ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
@@ -122,6 +124,7 @@ router.get('/:scanId', protect, async (req, res) => {
       vulnerabilityCount: entry.vulnerabilityCount,
       riskScore: entry.riskScore,
       bySeverity: entry.bySeverity,
+      source: entry.source || 'web',
     });
   }
 
@@ -141,6 +144,7 @@ router.get('/:scanId', protect, async (req, res) => {
       vulnerabilityCount: doc.vulnerabilityCount,
       riskScore: doc.riskScore,
       bySeverity: doc.bySeverity,
+      source: doc.source || 'web',
     });
   } catch (dbErr) {
     return res.status(500).json({ message: 'Database error', error: dbErr.message });

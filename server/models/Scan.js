@@ -75,6 +75,20 @@ const scanSchema = new mongoose.Schema({
     type: [logSchema],
     default: [],
   },
+  // ─── Extension-scan extras ───────────────────────
+  source: {
+    type: String,
+    enum: ['web', 'extension'],
+    default: 'web',
+  },
+  targetPath: {
+    type: String,
+    default: null,
+  },
+  htmlReport: {
+    type: String,
+    default: null,
+  },
 }, { timestamps: false });
 
 module.exports = mongoose.model('Scan', scanSchema);
