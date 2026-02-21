@@ -1,0 +1,102 @@
+{
+  "name": "vulentry",
+  "publisher": "vexstorm",
+  "displayName": "vulentry",
+  "description": "Multi-agent AI Security Scanner powered by LangGraph + Mistral",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.109.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "vulentry.runScan",
+        "title": "Vulentry: Run Security Scan on Folder"
+      },
+      {
+        "command": "vulentry.runScanOnOpen",
+        "title": "Vulentry: Scan Currently Open Workspace"
+      }
+    ],
+    "configuration": {
+      "title": "Vulentry Security Scanner",
+      "properties": {
+        "vulentry.mistralApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Your Mistral API key (https://console.mistral.ai)"
+        },
+        "vulentry.mistralModel": {
+          "type": "string",
+          "default": "mistral-large-latest",
+          "enum": [
+            "mistral-large-latest",
+            "mistral-medium-latest",
+            "mistral-small-latest",
+            "open-mixtral-8x22b"
+          ],
+          "description": "Mistral model to use for analysis"
+        },
+        "vulentry.maxFileSizeKB": {
+          "type": "number",
+          "default": 200,
+          "description": "Skip files larger than this size (KB)"
+        },
+        "vulentry.fileExtensions": {
+          "type": "array",
+          "default": [
+            ".js",
+            ".jsx",
+            ".ts",
+            ".tsx",
+            ".py",
+            ".php",
+            ".java",
+            ".go",
+            ".rb",
+            ".env",
+            ".json",
+            ".yaml",
+            ".yml",
+            ".sh"
+          ],
+          "description": "File extensions to scan"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "esbuild extension.js --bundle --outfile=dist/extension.js --external:vscode --platform=node --format=cjs --minify",
+    "lint": "eslint .",
+    "pretest": "npm run lint",
+    "test": "vscode-test"
+  },
+  "dependencies": {
+    "@langchain/core": "^0.3.80",
+    "@langchain/langgraph": "^0.2.74",
+    "@langchain/mistralai": "^0.1.1",
+    "acorn": "^8.16.0",
+    "acorn-walk": "^8.3.5",
+    "glob": "^10.5.0",
+    "ignore": "^5.3.2",
+    "js-yaml": "^4.1.1",
+    "langchain": "^0.3.37",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/vscode": "^1.109.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "esbuild": "^0.27.3",
+    "eslint": "^9.39.2"
+  }
+}
