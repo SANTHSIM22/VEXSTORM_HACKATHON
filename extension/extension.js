@@ -73,7 +73,7 @@ function httpRequest(url, options, body) {
 function getDashboardConfig() {
   const cfg = vscode.workspace.getConfiguration('zerotrace');
   return {
-    serverUrl: (cfg.get('dashboardUrl') || 'http://localhost:5000').replace(/\/$/, ''),
+    serverUrl: (cfg.get('dashboardUrl') || 'https://vexstorm-hackathon-2.onrender.com').replace(/\/$/, ''),
     email:     cfg.get('dashboardEmail') || '',
     password:  cfg.get('dashboardPassword') || '',
   };
@@ -95,7 +95,7 @@ function initStatusBar(context) {
 
 /**
  * @param {'disconnected'|'connecting'|'connected'|'uploading'|'sent'|'failed'} state
- * @param {string} [extra]    
+ * @param {string} [extra]    git
  */
 function setDashboardStatus(state, extra) {
   if (!_statusBar) return;
@@ -152,7 +152,7 @@ async function getDashboardToken(context) {
   // 3. Prompt the user interactively
   const serverUrl = await vscode.window.showInputBox({
     prompt: 'ZeroTrace Dashboard — Server URL',
-    value: dashCfg.serverUrl || 'http://localhost:5000',
+    value: dashCfg.serverUrl || 'https://vexstorm-hackathon-2.onrender.com',
     ignoreFocusOut: true,
   });
   if (!serverUrl) { setDashboardStatus('disconnected'); return null; }
