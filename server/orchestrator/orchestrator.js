@@ -1,12 +1,37 @@
 const AgentRegistry = require('./agentRegistry');
 const RiskEngine = require('../engine/riskEngine');
 
+/* ── Console colors for agent log output ── */
+const AGENT_COLORS = {
+    SYSTEM:        '\x1b[34m',   // blue
+    ORCHESTRATOR:  '\x1b[35m',   // magenta
+    ERROR:         '\x1b[31m',   // red
+    recon:         '\x1b[36m',   // cyan
+    planner:       '\x1b[35m',   // magenta
+    injection:     '\x1b[31m',   // red
+    xss:           '\x1b[33m',   // yellow
+    auth:          '\x1b[33m',   // yellow
+    config:        '\x1b[32m',   // green
+    ssrf:          '\x1b[35m',   // magenta
+    accessControl: '\x1b[33m',   // yellow
+    pathTraversal: '\x1b[32m',   // green
+    crypto:        '\x1b[34m',   // blue
+    dependency:    '\x1b[36m',   // cyan
+    integrity:     '\x1b[36m',   // cyan
+    logging:       '\x1b[90m',   // gray
+    businessLogic: '\x1b[35m',   // magenta
+    remediation:   '\x1b[35m',   // magenta
+};
+const RESET = '\x1b[0m';
+const DIM   = '\x1b[90m';
+const BOLD  = '\x1b[1m';
+
 class Orchestrator {
     constructor(logger, memory, findingsStore, registryRef = null) {
         this.logger = logger;
         this.memory = memory;
         this.findingsStore = findingsStore;
-        this.registry = new AgentRegistry(logger, memory, findingsStore);
+        this.registry = new AgentRegistry(logger, memory, findingsStore, registryRef);
         this.riskEngine = new RiskEngine();
         this.registryRef = registryRef;
         this.state = 'idle'; // idle, recon, planning, scanning, remediation, reporting, done
@@ -21,6 +46,11 @@ class Orchestrator {
         });
         // Sync live phase
         this.registryRef.currentPhase = this.state;
+
+        // ── Pretty-print to server console (matches dashboard live-log format) ──
+        const color = AGENT_COLORS[agent] || RESET;
+        const ts = new Date().toLocaleTimeString();
+        console.log(`${DIM}[${ts}]${RESET} ${color}${BOLD}[${agent}]${RESET} ${msg}`);
     }
 
     /** Sync live findings count to registry so poll can see progress mid-scan */

@@ -2,8 +2,8 @@ const BaseAgent = require('./baseAgent');
 const { makeRequest } = require('../utils/httpClient');
 
 class DependencyAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('DependencyAgent', 'A06 - Vulnerable Components', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('DependencyAgent', 'A06 - Vulnerable Components', logger, memory, findingsStore, registryRef);
     }
 
     /**

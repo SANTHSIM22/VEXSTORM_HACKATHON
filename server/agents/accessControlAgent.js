@@ -6,8 +6,8 @@ const { URL } = require('url');
 const AC_TIMEOUT = 6000;
 
 class AccessControlAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('AccessControlAgent', 'A01 - Broken Access Control', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('AccessControlAgent', 'A01 - Broken Access Control', logger, memory, findingsStore, registryRef);
         this.validator = new ValidationEngine(logger);
     }
 
@@ -171,19 +171,119 @@ class AccessControlAgent extends BaseAgent {
         }
 
         // Phase 3: Forced browsing
+        // We must distinguish between a real admin panel and a login-redirect page.
+        // Many apps/SPAs return 200 at /admin but serve a login shell or loading spinner.
         const adminPaths = ['/admin', '/administrator', '/admin/dashboard', '/panel', '/manage', '/backend'];
+
+        /** Patterns that indicate the response is a login/auth page, not an actual admin panel */
+        const LOGIN_INDICATORS = /login|log.in|sign.in|signin|password|forgot.password|authenticate|sso|credentials|username.*password/i;
+        /** Patterns that indicate the response is a real admin panel / dashboard */
+        const ADMIN_INDICATORS = /dashboard|settings|manage|users.*list|configuration|control.panel|admin.home|analytics|system.status|create.*user|edit.*user|delete|overview/i;
+
+        /**
+         * Strip <script>, <style>, and HTML tags to get only visible text content.
+         * This prevents script paths like "app/admin/dashboard/page-xxx.js"
+         * from falsely matching admin-content patterns.
+         */
+        function getVisibleText(html) {
+            return html
+                .replace(/<script[\s\S]*?<\/script>/gi, '')   // remove script blocks
+                .replace(/<style[\s\S]*?<\/style>/gi, '')     // remove style blocks
+                .replace(/<[^>]+>/g, ' ')                     // strip remaining HTML tags
+                .replace(/\s+/g, ' ')                         // collapse whitespace
+                .trim();
+        }
+
+        /**
+         * Detect SPA loading shells – pages that return 200 but only contain
+         * a spinner / "Loading…" placeholder with no real content.
+         */
+        function isSpaLoadingShell(html) {
+            const visibleText = getVisibleText(html);
+            // Very little visible text (just "Loading…" or a single word)
+            if (visibleText.length < 80) return true;
+            // Explicit loading-spinner patterns
+            if (/^\s*(loading|please wait|redirecting)\b/i.test(visibleText)) return true;
+            return false;
+        }
+
+        /**
+         * Detect Next.js / React embedded 404 in RSC or hydration payload.
+         */
+        function hasEmbedded404(html) {
+            return /\"notFound\":\s*\[/.test(html)
+                || /404:\s*This page could not be found/i.test(html)
+                || /<title[^>]*>\s*404\b/i.test(html);
+        }
+
         for (const path of adminPaths) {
             try {
                 const response = await makeRequest(`${baseOrigin}${path}`, { retries: 1, timeout: AC_TIMEOUT });
                 if (response.status === 200) {
                     const respBody = typeof response.data === 'string' ? response.data : '';
+                    const visibleText = getVisibleText(respBody);
+                    const finalUrl = (response.finalUrl || response.url || '').toLowerCase();
+                    const requestedUrl = `${baseOrigin}${path}`.toLowerCase();
+
+                    // ── Quick-skip: SPA loading shell or embedded 404 ──
+                    if (isSpaLoadingShell(respBody) || hasEmbedded404(respBody)) {
+                        this.logger.debug?.(`[AccessControlAgent] Skipping ${path} — SPA shell / embedded 404`);
+                        continue;
+                    }
+
+                    // ── Check 1: Was the request redirected to a different URL? ──
+                    const wasRedirected = finalUrl !== requestedUrl && finalUrl !== '';
+
+                    // ── Check 2: Does the final URL or visible body look like a login page? ──
+                    const finalUrlIsLogin = LOGIN_INDICATORS.test(finalUrl);
+                    const bodyHasLoginForm = LOGIN_INDICATORS.test(visibleText)
+                        && /(<form|<input|type=.password)/i.test(respBody);
+                    const bodyLooksLikeLogin =
+                        /<title[^>]*>.*(?:login|sign.in|auth).*<\/title>/i.test(respBody)
+                        || (visibleText.length < 2000 && LOGIN_INDICATORS.test(visibleText)
+                            && !ADMIN_INDICATORS.test(visibleText));
+
+                    // ── Strong signal: HTTP redirect to a login URL → ALWAYS skip ──
+                    // A redirect means the server enforces authentication; the body
+                    // content of the login page is irrelevant.
+                    if (wasRedirected && finalUrlIsLogin) {
+                        this.logger.debug?.(`[AccessControlAgent] Skipping ${path} — redirected to login URL (${finalUrl})`);
+                        continue;
+                    }
+
+                    // ── Check 3: Does the VISIBLE body contain real admin content? ──
+                    // Only visible text counts – script URLs / JSON payloads are excluded.
+                    const bodyHasAdminContent = ADMIN_INDICATORS.test(visibleText) && visibleText.length > 200;
+
+                    // Weaker signals: body looks like a login page.
+                    // Only skip if there's no real admin content visible alongside the form.
+                    if ((bodyHasLoginForm || bodyLooksLikeLogin) && !bodyHasAdminContent) {
+                        this.logger.debug?.(`[AccessControlAgent] Skipping ${path} — login form detected in body`);
+                        continue;
+                    }
+
+                    // If we get here but there's no meaningful visible content, skip.
+                    // A real admin panel would have navigation, forms, tables etc.
+                    if (visibleText.length < 100 && !bodyHasAdminContent) {
+                        this.logger.debug?.(`[AccessControlAgent] Skipping ${path} — no meaningful visible content (${visibleText.length} chars)`);
+                        continue;
+                    }
+
+                    // Adjust confidence based on real admin content presence
+                    const adjustedConfidence = this._calculateConfidence({
+                        vulnType: 'forcedBrowsing',
+                        statusIs200: true,
+                        contentLength: visibleText.length,
+                        paramNameRelevant: /admin|manage|backend/i.test(path),
+                    }) + (bodyHasAdminContent ? 0.15 : 0);
+
                     this.addFinding({
                         type: 'Broken Access Control',
                         endpoint: `${baseOrigin}${path}`,
                         parameter: 'N/A',
                         description: `Admin path "${path}" accessible without authentication`,
-                        evidence: `HTTP 200 response on ${path}`,
-                        confidenceScore: this._calculateConfidence({ vulnType: 'forcedBrowsing', statusIs200: true, contentLength: respBody.length, paramNameRelevant: /admin|manage|backend/i.test(path) }),
+                        evidence: `HTTP 200 response on ${path}${bodyHasAdminContent ? ' — response contains admin/dashboard content' : ''}`,
+                        confidenceScore: Math.min(1.0, adjustedConfidence),
                         exploitScenario: `Attacker accesses ${path} without authentication`,
                         impact: 'Unauthorized admin access',
                         reproductionSteps: [

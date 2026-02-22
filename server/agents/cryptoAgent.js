@@ -2,8 +2,8 @@ const BaseAgent = require('./baseAgent');
 const { makeRequest } = require('../utils/httpClient');
 
 class CryptoAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('CryptoAgent', 'A02 - Cryptographic Failures', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('CryptoAgent', 'A02 - Cryptographic Failures', logger, memory, findingsStore, registryRef);
     }
 
     /**

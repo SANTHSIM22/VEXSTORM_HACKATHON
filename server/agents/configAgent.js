@@ -3,8 +3,8 @@ const { makeRequest } = require('../utils/httpClient');
 const HeaderAnalyzer = require('../tools/headerAnalyzer');
 
 class ConfigAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('ConfigAgent', 'A05 - Security Misconfiguration', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('ConfigAgent', 'A05 - Security Misconfiguration', logger, memory, findingsStore, registryRef);
     }
 
     /**

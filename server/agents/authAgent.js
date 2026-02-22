@@ -3,8 +3,8 @@ const { makeRequest } = require('../utils/httpClient');
 const { chat, analyzeResponse } = require('../llm/mistralClient');
 
 class AuthAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('AuthAgent', 'A07 - Auth Failures', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('AuthAgent', 'A07 - Auth Failures', logger, memory, findingsStore, registryRef);
         this.goal = "Identify authentication and session management weaknesses, including brute-force vulnerabilities, weak credentials, and insecure cookie configurations through behavioral analysis.";
     }
 
@@ -89,9 +89,23 @@ class AuthAgent extends BaseAgent {
         const { forms, apiEndpoints, urls } = this.memory.attackSurface;
 
         // 1. REASONING: Identify sensitive endpoints
+        // Only target actual login/signin endpoints, NOT every URL containing "auth"
+        // (auth/refresh, auth/logout, auth/verify are NOT login endpoints)
+        const LOGIN_PATH_RE = /login|signin|sign-in|log-in/i;
+        const AUTH_NON_LOGIN_RE = /refresh|logout|log-out|verify|confirm|reset|forgot|register|signup|sign-up|callback|token\/revoke/i;
+
+        const isLoginEndpoint = (urlStr) => {
+            if (LOGIN_PATH_RE.test(urlStr)) return true;
+            // If URL has "auth" but also a non-login suffix, skip it
+            if (/auth/i.test(urlStr) && AUTH_NON_LOGIN_RE.test(urlStr)) return false;
+            // Bare /auth or /api/auth (without further path) could be login
+            if (/\/auth\/?$/i.test(urlStr) || /\/auth\/?\?/i.test(urlStr)) return true;
+            return false;
+        };
+
         const sensitiveEndpoints = [
-            ...forms.filter(f => f.hasPasswordField || /login|auth/i.test(f.action)).map(f => ({ target: f.action, type: 'form', data: f })),
-            ...(apiEndpoints || []).filter(a => /login|auth|session/i.test(a)).map(a => ({ target: a, type: 'api' }))
+            ...forms.filter(f => f.hasPasswordField || LOGIN_PATH_RE.test(f.action)).map(f => ({ target: f.action, type: 'form', data: f })),
+            ...(apiEndpoints || []).filter(a => isLoginEndpoint(a) || /session/i.test(a)).map(a => ({ target: a, type: 'api' }))
         ];
 
         this.logger.info(`[AuthAgent] Identified ${sensitiveEndpoints.length} potential authentication endpoints.`);
@@ -106,7 +120,7 @@ class AuthAgent extends BaseAgent {
         }
 
         // 4. WEAK CREDENTIALS API TEST
-        const loginApis = (apiEndpoints || []).filter(a => /login|auth|signin/i.test(a));
+        const loginApis = (apiEndpoints || []).filter(a => isLoginEndpoint(a));
         for (const api of [...new Set(loginApis)].slice(0, 5)) {
             await this._testWeakCredentials(api);
         }
@@ -228,6 +242,18 @@ class AuthAgent extends BaseAgent {
             ];
         }
 
+        // First, capture a baseline: send obviously bad credentials to see what
+        // a failed login looks like (status, cookies, body shape).
+        let baselineStatus = 0;
+        let baselineCookieCount = 0;
+        let baselineBodyKeys = [];
+        try {
+            const baseRes = await makeRequest(api, { method: 'POST', data: { email: 'ZZnonexistent@invalid.tld', password: 'ZZZbadpass999!!!' }, retries: 0, timeout: 5000 });
+            baselineStatus = baseRes.status;
+            baselineCookieCount = [].concat(baseRes.headers['set-cookie'] || []).length;
+            if (baseRes.data && typeof baseRes.data === 'object') baselineBodyKeys = Object.keys(baseRes.data);
+        } catch (_) { }
+
         for (const cred of creds) {
             try {
                 const res = await makeRequest(api, {
@@ -237,27 +263,76 @@ class AuthAgent extends BaseAgent {
                     timeout: 5000
                 });
 
-                // Adaptive success detection
-                const successIndicators = [
-                    res.status === 200 && (res.data.token || res.data.success || res.data.authentication),
-                    res.status === 302 && res.headers['set-cookie'],
-                    res.data?.user?.email === cred.email
-                ];
+                const body = res.data || {};
+                const bodyStr = typeof body === 'string' ? body : JSON.stringify(body);
+                const cookies = [].concat(res.headers['set-cookie'] || []);
 
-                if (successIndicators.some(i => i)) {
+                // ── Robust success detection ──
+                // A login is only "successful" when MULTIPLE strong signals align.
+                // A cookie alone is NOT enough (sites set tracking/CSRF cookies on failures too).
+
+                // Strong signals (each worth 1 point)
+                let score = 0;
+                const signals = [];
+
+                // 1. JWT / access token in response body
+                const hasToken = !!(body.token || body.access_token || body.accessToken || body.authentication?.token);
+                if (hasToken) { score += 2; signals.push('auth token returned'); }
+
+                // 2. Explicit success field that is truthy
+                const hasExplicitSuccess = body.success === true || body.authenticated === true || body.status === 'success';
+                if (hasExplicitSuccess) { score += 2; signals.push('explicit success field'); }
+
+                // 3. User object in response (with email/name)
+                const hasUserObj = !!(body.user || body.profile || body.account);
+                if (hasUserObj) { score += 1; signals.push('user object returned'); }
+
+                // 4. Email match — response contains the credential's email
+                const emailMatch = !!(cred.email && bodyStr.includes(cred.email));
+                if (emailMatch) { score += 1; signals.push('email matched in response'); }
+
+                // 5. Status code improved vs baseline (e.g. baseline 401 → now 200)
+                const statusImproved = res.status === 200 && baselineStatus >= 400;
+                if (statusImproved) { score += 1; signals.push(`status improved: ${baselineStatus} → ${res.status}`); }
+
+                // 6. New cookies set that weren't in the baseline failure response
+                const newCookies = cookies.length > baselineCookieCount;
+                if (newCookies) { score += 0.5; signals.push('new cookies set vs baseline'); }
+
+                // 7. 302 redirect to a non-login page (dashboard, home, etc.)
+                const redirectToApp = res.status === 302 && res.headers['location']
+                    && !/login|signin|sign-in|auth|error/i.test(res.headers['location']);
+                if (redirectToApp) { score += 1.5; signals.push(`redirect to ${res.headers['location']}`); }
+
+                // Negative signals — penalize responses that look like failures
+                const hasErrorField = body.error || body.message?.toLowerCase?.()?.includes?.('invalid')
+                    || body.message?.toLowerCase?.()?.includes?.('unauthorized')
+                    || body.message?.toLowerCase?.()?.includes?.('incorrect');
+                if (hasErrorField) { score -= 2; signals.push('error/invalid message in body'); }
+
+                if (res.status === 401 || res.status === 403) { score -= 2; signals.push(`status ${res.status} = rejection`); }
+
+                // body.success === false is explicitly a failure
+                if (body.success === false) { score -= 2; signals.push('success: false'); }
+
+                // Threshold: need at least 2 points to consider it a real login
+                this.logger.debug?.(`[AuthAgent] ${cred.username || cred.email} score=${score} signals=[${signals.join(', ')}]`);
+
+                if (score >= 2) {
                     this.addFinding({
                         type: 'Authentication Weakness',
                         endpoint: api,
-                        description: `Successful login with feasible credential: ${cred.username || cred.email}`,
-                        evidence: `Credential: ${JSON.stringify(cred)}. Indicator: ${res.data.token ? 'JWT returned' : 'Cookie/Session established'}`,
-                        confidenceScore: this._calculateConfidence({ vulnType: 'weakCreds', tokenReturned: !!(res.data.token), sessionEstablished: !!(res.status === 302 && res.headers['set-cookie']), emailMatched: !!(res.data?.user?.email === cred.email), successIndicatorCount: successIndicators.filter(i => i).length }),
+                        description: `Successful login with weak credential: ${cred.username || cred.email}`,
+                        evidence: `Credential: ${JSON.stringify(cred)}. Signals: ${signals.filter(s => !s.startsWith('error') && !s.startsWith('status 4') && !s.startsWith('success:')).join(', ')}`,
+                        confidenceScore: this._calculateConfidence({ vulnType: 'weakCreds', tokenReturned: hasToken, sessionEstablished: redirectToApp || (newCookies && statusImproved), emailMatched: emailMatch, successIndicatorCount: Math.floor(score) }),
                         impact: 'Full account takeover and data access',
                         reproductionSteps: [
                             `1. Run: curl -X POST "${api}" -H "Content-Type: application/json" -d '${JSON.stringify(cred)}'`,
-                            `2. Observe the successful authentication response or session cookie.`
+                            `2. Observe the successful authentication response.`,
+                            `3. Evidence: ${signals.filter(s => !s.startsWith('error')).join('; ')}`
                         ]
                     });
-                    break; // Stop after first successful takeover
+                    break; // Stop after first confirmed takeover
                 }
             } catch (_) { }
         }
@@ -306,20 +381,49 @@ class AuthAgent extends BaseAgent {
     }
 
     async _checkCookies(target) {
+        // Only flag cookies that look like session/auth identifiers.
+        // Tracking cookies, analytics cookies, preference cookies, CSRF tokens etc.
+        // don't need HttpOnly/Secure and flagging them creates noise.
+        const SESSION_COOKIE_RE = /^(sess|session|sid|ssid|connect\.sid|jsessionid|phpsessid|asp\.net_sessionid|_session|auth|token|jwt|access|refresh|remember|login|user_session)/i;
+        const IGNORED_COOKIE_RE = /^(_ga|_gid|_gat|_fbp|_gcl|utm_|__utm|_hjid|hubspot|intercom|crisp|drift|__cf|cf_|__stripe|_pk_|mp_|amplitude|__zlcmid|ajs_|_dc_|optimizely|__hstc|__hssc|__hssrc|csrftoken|_csrf|xsrf)/i;
+
         try {
             const res = await makeRequest(target, { retries: 0 });
             const cookies = [].concat(res.headers['set-cookie'] || []);
             for (const cookie of cookies) {
-                if (!/httponly/i.test(cookie) || !/secure/i.test(cookie)) {
+                const cookieName = (cookie.split('=')[0] || '').trim();
+
+                // Skip non-session cookies (analytics, tracking, CSRF)
+                if (IGNORED_COOKIE_RE.test(cookieName)) continue;
+
+                // Only flag cookies that look like session identifiers
+                // OR cookies that carry a substantial value (not just 'true'/'1')
+                const cookieValue = (cookie.split(';')[0]?.split('=').slice(1).join('=') || '').trim();
+                const looksLikeSession = SESSION_COOKIE_RE.test(cookieName)
+                    || cookieValue.length > 20; // Long opaque values are likely session IDs
+
+                if (!looksLikeSession) continue;
+
+                const missingHttpOnly = !/httponly/i.test(cookie);
+                const missingSecure = !/secure/i.test(cookie);
+
+                if (missingHttpOnly || missingSecure) {
+                    const issues = [];
+                    if (missingHttpOnly) issues.push('HttpOnly');
+                    if (missingSecure) issues.push('Secure');
+
                     this.addFinding({
                         type: 'Session Weakness',
                         endpoint: target,
-                        parameter: cookie.split('=')[0],
-                        description: 'Insecure cookie flags',
+                        parameter: cookieName,
+                        description: `Session cookie "${cookieName}" missing ${issues.join(' and ')} flag${issues.length > 1 ? 's' : ''}`,
                         evidence: `Cookie: ${cookie}`,
-                        confidenceScore: this._calculateConfidence({ vulnType: 'cookie', missingHttpOnly: !/httponly/i.test(cookie), missingSecure: !/secure/i.test(cookie) }),
-                        impact: 'Session hijacking',
-                        reproductionSteps: [`Check set-cookie header for Secure/HttpOnly flags`]
+                        confidenceScore: this._calculateConfidence({ vulnType: 'cookie', missingHttpOnly, missingSecure }),
+                        impact: 'Session hijacking via XSS or network sniffing',
+                        reproductionSteps: [
+                            `1. Run: curl -sI "${target}" | grep -i set-cookie`,
+                            `2. Verify cookie "${cookieName}" is missing: ${issues.join(', ')}`
+                        ]
                     });
                 }
             }

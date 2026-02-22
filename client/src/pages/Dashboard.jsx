@@ -1986,7 +1986,14 @@ const Dashboard = () => {
                                   <span className={`text-xs px-2.5 py-1 rounded-full border font-bold shrink-0 ${sevStyle(v.severity)}`}>
                                     {v.severity}
                                   </span>
-                                  <span className="flex-1 text-sm font-semibold text-[#F9FAFB] min-w-0 truncate">{v.type}</span>
+                                  <span className="flex-1 text-sm font-semibold text-[#F9FAFB] min-w-0 truncate">
+                                    {v.type}
+                                    {v.needsManualVerification && (
+                                      <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.25)", color: "#FBBF24" }}>
+                                        Needs Manual Verification
+                                      </span>
+                                    )}
+                                  </span>
                                   <span className="text-xs font-mono text-[#94A3B8] shrink-0 hidden sm:block truncate max-w-[200px]">{v.endpoint}</span>
                                   <span className="text-xs text-[#94A3B8] shrink-0 hidden md:block truncate max-w-[140px]">{v.owaspCategory || "—"}</span>
                                   <span className="text-xs font-mono font-bold shrink-0" style={{
@@ -2010,7 +2017,7 @@ const Dashboard = () => {
                                     { label: "ID", value: v.id },
                                     { label: "OWASP", value: v.owaspCategory || "—" },
                                     { label: "Parameter", value: v.parameter || "N/A" },
-                                    { label: "Confidence", value: v.confidenceScore != null ? `${Math.round(v.confidenceScore * 100)}%` : "—" },
+                                    { label: "Confidence", value: v.confidenceScore != null ? `${Math.round(v.confidenceScore * 100)}%${v.needsManualVerification ? ' ⚠️' : ''}` : "—" },
                                   ].map((m) => (
                                     <div key={m.label} className="p-3 rounded-lg" style={glassSubtle}>
                                       <div className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-0.5">{m.label}</div>
@@ -2018,6 +2025,13 @@ const Dashboard = () => {
                                     </div>
                                   ))}
                                 </div>
+
+                                {/* Manual verification warning */}
+                                {v.needsManualVerification && (
+                                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold" style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", color: "#FBBF24" }}>
+                                    <span>⚠️</span> This finding could not be fully confirmed and may be a false positive — <span className="underline">Needs Manual Verification</span>
+                                  </div>
+                                )}
 
                                 {/* Endpoint */}
                                 <div className="p-3 rounded-lg" style={glassSubtle}>

@@ -32,6 +32,7 @@ async function makeRequest(url, options = {}) {
                 headers: response.headers,
                 data: response.data,
                 url: response.config.url,
+                finalUrl: response.request?.res?.responseUrl || response.request?.responseURL || response.config.url,
                 timingMs: 0,
             };
         } catch (err) {
