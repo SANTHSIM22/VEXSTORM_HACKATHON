@@ -394,6 +394,14 @@ Test app runs at `http://localhost:3000`
 
 See [test/VULNERABILITIES.md](test/VULNERABILITIES.md) for the full list of seeded vulnerabilities.
 
+
+ZeroTrace can also be tested against a live intentionally vulnerable application:
+
+**OWASP Juice Shop (Deployed Instance)**  
+https://juice-shop-vsq1.onrender.com/
+
+Use this URL in the dashboard to simulate real-world vulnerability scans.
+
 ---
 
 ## Environment Variables
