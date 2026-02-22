@@ -7,8 +7,8 @@ const { appendParam } = require('../utils/urlHelper');
 const SSRF_TIMEOUT = 10000;
 
 class SSRFAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('SSRFAgent', 'A10 - SSRF', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('SSRFAgent', 'A10 - SSRF', logger, memory, findingsStore, registryRef);
         this.validator = new ValidationEngine(logger);
     }
 

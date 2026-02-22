@@ -957,6 +957,258 @@ const Dashboard = () => {
               </div>
             )}
 
+            {/* ── WHAT GETS TESTED PANEL ── */}
+            {!scanInProgress && !scanJustDone && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(124,58,237,0.15)", border: "1px solid rgba(124,58,237,0.3)" }}>
+                    <FlaskConical size={16} className="text-[#a855f7]" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-extrabold text-[#f3e8ff] font-heading uppercase tracking-wider">What Gets Tested & How</h2>
+                    <p className="text-xs text-[#a78bfa]/50 mt-0.5">All checks are deterministic HTTP/DOM probes. LLM is used only for payload generation &amp; prioritisation — not for deciding if something is vulnerable.</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                  {[
+                    {
+                      icon: <Globe size={15} />,
+                      color: "#22d3ee",
+                      label: "Reconnaissance",
+                      owasp: "Surface Mapping",
+                      method: "DETERMINISTIC",
+                      methodColor: "text-green-400",
+                      desc: "Crawls all reachable URLs, collects HTML forms, URL parameters, and API endpoints. Probes known sensitive paths and validates responses with content-specific rules.",
+                      checks: [
+                        "Crawls up to configured depth for URLs, forms & params",
+                        "/robots.txt, /sitemap.xml, /.env, /.git/HEAD",
+                        "/admin, /api, /swagger.json path probing",
+                        "SPA detection — avoids false positives on React/Next.js routes",
+                        "Content validators confirm real secret files vs HTML shells",
+                      ],
+                    },
+                    {
+                      icon: <Database size={15} />,
+                      color: "#f87171",
+                      label: "SQL / NoSQL Injection",
+                      owasp: "A03 – Injection",
+                      method: "PROBE + PATTERN",
+                      methodColor: "text-orange-400",
+                      desc: "Sends injection payloads to every discovered form field and URL parameter. Detects vulnerabilities through DB-specific error signatures, auth bypass, and anomaly scoring.",
+                      checks: [
+                        "DB error patterns: MySQL, PostgreSQL, Oracle, SQLite, MSSQL",
+                        "Auth bypass: 200 + token returned on malicious credential",
+                        "500 response with DB stack trace = High confidence",
+                        "Generic server errors filtered out (not flagged as SQLi)",
+                        "Timing payloads (SLEEP/WAITFOR) excluded to avoid noise",
+                      ],
+                    },
+                    {
+                      icon: <Zap size={15} />,
+                      color: "#fb923c",
+                      label: "Cross-Site Scripting (XSS)",
+                      owasp: "A03 – Injection",
+                      method: "PROBE + REFLECTION",
+                      methodColor: "text-orange-400",
+                      desc: "Injects XSS payloads into forms and URL parameters, then checks whether the payload is reflected unescaped in the HTTP response body or via DOM sinks.",
+                      checks: [
+                        "Reflected XSS: payload found unencoded in response HTML",
+                        "DOM XSS: detects dangerous sinks (innerHTML, document.write)",
+                        "DOM sources: location.hash, location.search, URLSearchParams",
+                        "Encoded reflection ≠ vulnerable (low confidence only)",
+                        "LLM used only to select top 15 high-risk input vectors",
+                      ],
+                    },
+                    {
+                      icon: <Lock size={15} />,
+                      color: "#fbbf24",
+                      label: "Auth & Session Management",
+                      owasp: "A07 – Auth Failures",
+                      method: "BEHAVIORAL PROBE",
+                      methodColor: "text-yellow-400",
+                      desc: "Tests login forms for missing security controls using real HTTP requests. Measures server response behaviour — not guessing.",
+                      checks: [
+                        "CSRF: checks for anti-CSRF tokens in login forms",
+                        "Rate limiting: sends 10 rapid requests, expects HTTP 429",
+                        "Weak creds: tries admin/admin, test/test, user/password",
+                        "Cookie flags: inspects Set-Cookie for HttpOnly & Secure",
+                        "JWT: decodes token header/payload, checks 'none' algorithm",
+                        "HTTP form: login over plain HTTP (no TLS) detected",
+                      ],
+                    },
+                    {
+                      icon: <Shield size={15} />,
+                      color: "#a855f7",
+                      label: "Access Control",
+                      owasp: "A01 – Broken Access Control",
+                      method: "PROBE + COMPARE",
+                      methodColor: "text-orange-400",
+                      desc: "Attempts to access admin/protected routes without authentication and compares responses to authenticated access. Detects IDOR and privilege escalation paths.",
+                      checks: [
+                        "Unauthenticated requests to /admin, /dashboard, /settings",
+                        "IDOR: swaps own resource ID with another user's ID",
+                        "Compares status codes: 200 unauthed = finding",
+                        "Redirect-only response (302 to login) = properly protected",
+                      ],
+                    },
+                    {
+                      icon: <Settings size={15} />,
+                      color: "#34d399",
+                      label: "Security Misconfiguration",
+                      owasp: "A05 – Misconfiguration",
+                      method: "HEADER ANALYSIS",
+                      methodColor: "text-green-400",
+                      desc: "Inspects HTTP response headers for missing security directives. All checks are header-read — no guessing.",
+                      checks: [
+                        "Missing: Strict-Transport-Security (HSTS)",
+                        "Missing: Content-Security-Policy (CSP)",
+                        "Missing: X-Frame-Options (clickjacking)",
+                        "Missing: X-Content-Type-Options",
+                        "Overly-permissive CORS: Access-Control-Allow-Origin: *",
+                        "Server version disclosure in Server / X-Powered-By headers",
+                      ],
+                    },
+                    {
+                      icon: <Radio size={15} />,
+                      color: "#ec4899",
+                      label: "SSRF",
+                      owasp: "A10 – SSRF",
+                      method: "PROBE + CALLBACK",
+                      methodColor: "text-orange-400",
+                      desc: "Submits internal/cloud metadata URLs to URL-accepting form fields and API parameters. Checks for response content that indicates server-side resolution.",
+                      checks: [
+                        "Payloads: 169.254.169.254 (AWS/GCP metadata), localhost",
+                        "Submits to any field accepting a URL value",
+                        "Checks response for cloud metadata signatures",
+                        "DNS rebinding paths tested where applicable",
+                      ],
+                    },
+                    {
+                      icon: <Layers size={15} />,
+                      color: "#a3e635",
+                      label: "Path Traversal",
+                      owasp: "A01 – Broken Access Control",
+                      method: "PROBE + SIGNATURE",
+                      methodColor: "text-orange-400",
+                      desc: "Injects directory traversal sequences into file/path parameters. Looks for OS file content signatures in the response.",
+                      checks: [
+                        "Payloads: ../../../etc/passwd, ..%2F..%2Fetc%2Fshadow",
+                        "Windows: ..\\..\\windows\\system32\\drivers\\etc\\hosts",
+                        "Response signature: root:x:0:0 (Linux), [fonts] (Windows)",
+                        "URL-encoded and double-encoded variants tested",
+                      ],
+                    },
+                    {
+                      icon: <Key size={15} />,
+                      color: "#818cf8",
+                      label: "Cryptography Failures",
+                      owasp: "A02 – Crypto Failures",
+                      method: "TLS + HEADER CHECK",
+                      methodColor: "text-green-400",
+                      desc: "Checks transport security and data-handling headers. All checks are connection-level or header-level reads.",
+                      checks: [
+                        "TLS version: flags SSLv3, TLS 1.0, TLS 1.1",
+                        "Weak ciphers: RC4, DES, 3DES, NULL, EXPORT",
+                        "Sensitive data over HTTP (not HTTPS)",
+                        "Mixed content: HTTPS page loading HTTP resources",
+                      ],
+                    },
+                    {
+                      icon: <Package size={15} />,
+                      color: "#38bdf8",
+                      label: "Vulnerable Dependencies",
+                      owasp: "A06 – Vulnerable Components",
+                      method: "VERSION MATCHING",
+                      methodColor: "text-green-400",
+                      desc: "Extracts JavaScript library versions from page source and script tags, then matches against known CVE version ranges.",
+                      checks: [
+                        "Scans <script> src and inline code for library signatures",
+                        "Detects: jQuery, React, Angular, lodash, moment, axios",
+                        "Matches version against CVE advisory ranges",
+                        "Checks CDN URLs for version numbers",
+                      ],
+                    },
+                    {
+                      icon: <CheckCircle2 size={15} />,
+                      color: "#2dd4bf",
+                      label: "Software Integrity",
+                      owasp: "A08 – Integrity Failures",
+                      method: "DOM INSPECTION",
+                      methodColor: "text-green-400",
+                      desc: "Reads all external script and stylesheet tags, checking for missing Subresource Integrity (SRI) hashes that allow CDN supply-chain attacks.",
+                      checks: [
+                        "Every <script src> and <link rel=stylesheet> from CDN",
+                        "Checks for integrity='sha256-...' or integrity='sha384-...'",
+                        "Missing SRI on external CDN resource = finding",
+                        "crossorigin attribute also verified",
+                      ],
+                    },
+                    {
+                      icon: <Eye size={15} />,
+                      color: "#64748b",
+                      label: "Logging & Error Exposure",
+                      owasp: "A09 – Logging Failures",
+                      method: "RESPONSE ANALYSIS",
+                      methodColor: "text-green-400",
+                      desc: "Sends invalid inputs and malformed requests, then inspects the error responses for stack traces, file paths, or internal info that aids attackers.",
+                      checks: [
+                        "Invalid inputs trigger error pages — checks for stack traces",
+                        "File path disclosure in error messages (e.g. /var/www/...)",
+                        "Framework/version disclosed in error (Django, Rails, Express)",
+                        "Verbose SQL errors in response body",
+                      ],
+                    },
+                  ].map((item, i) => (
+                    <div key={i} className="p-4 rounded-xl transition-all duration-200 hover:scale-[1.01]" style={{
+                      background: "rgba(255,255,255,0.025)",
+                      border: `1px solid ${item.color}22`,
+                      boxShadow: `0 4px 16px ${item.color}08`,
+                    }}>
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${item.color}18`, border: `1px solid ${item.color}30` }}>
+                            <span style={{ color: item.color }}>{item.icon}</span>
+                          </div>
+                          <div>
+                            <div className="text-sm font-bold text-[#f3e8ff] leading-tight">{item.label}</div>
+                            <div className="text-[10px] text-[#a78bfa]/50 font-mono">{item.owasp}</div>
+                          </div>
+                        </div>
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${item.methodColor}`} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid currentColor", opacity: 0.8, whiteSpace: "nowrap" }}>
+                          {item.method}
+                        </span>
+                      </div>
+                      {/* Desc */}
+                      <p className="text-[11px] text-[#94a3b8] leading-relaxed mb-3">{item.desc}</p>
+                      {/* Checks */}
+                      <ul className="space-y-1">
+                        {item.checks.map((c, j) => (
+                          <li key={j} className="flex items-start gap-2 text-[11px] text-[#cbd5e1]/70">
+                            <span className="mt-0.5 shrink-0 text-[8px]" style={{ color: item.color }}>▸</span>
+                            {c}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Hallucination disclaimer */}
+                <div className="flex items-start gap-3 p-4 rounded-xl" style={{ background: "rgba(251,191,36,0.04)", border: "1px solid rgba(251,191,36,0.15)" }}>
+                  <AlertTriangle size={16} className="text-yellow-400 shrink-0 mt-0.5" />
+                  <div className="text-xs text-[#94a3b8] leading-relaxed">
+                    <span className="font-bold text-yellow-300">About LLM-assisted findings: </span>
+                    The AI model (Mistral) is used to <strong className="text-[#f3e8ff]">generate payloads and prioritise test vectors</strong> — it does not decide if something is vulnerable.
+                    All vulnerability decisions are made by <strong className="text-[#f3e8ff]">deterministic checks</strong> (HTTP status codes, response body patterns, header inspection).
+                    If a finding seems wrong, check its <strong className="text-[#f3e8ff]">confidence score</strong> and <strong className="text-[#f3e8ff]">evidence</strong> in the Vulnerabilities tab.
+                    Low-confidence findings (&lt;0.4) should be manually verified before treating them as real issues.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ── LIVE SCAN PANEL — full width ── */}
             {scanInProgress && selectedScan && (() => {
               const progressPct = livePhaseIdx < 0 ? 3 : Math.round(((livePhaseIdx + 1) / PHASES.length) * 100);
@@ -1986,7 +2238,14 @@ const Dashboard = () => {
                                   <span className={`text-xs px-2.5 py-1 rounded-full border font-bold shrink-0 ${sevStyle(v.severity)}`}>
                                     {v.severity}
                                   </span>
-                                  <span className="flex-1 text-sm font-semibold text-[#F9FAFB] min-w-0 truncate">{v.type}</span>
+                                  <span className="flex-1 text-sm font-semibold text-[#F9FAFB] min-w-0 truncate">
+                                    {v.type}
+                                    {v.needsManualVerification && (
+                                      <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.25)", color: "#FBBF24" }}>
+                                        Needs Manual Verification
+                                      </span>
+                                    )}
+                                  </span>
                                   <span className="text-xs font-mono text-[#94A3B8] shrink-0 hidden sm:block truncate max-w-[200px]">{v.endpoint}</span>
                                   <span className="text-xs text-[#94A3B8] shrink-0 hidden md:block truncate max-w-[140px]">{v.owaspCategory || "—"}</span>
                                   <span className="text-xs font-mono font-bold shrink-0" style={{
@@ -2010,7 +2269,7 @@ const Dashboard = () => {
                                     { label: "ID", value: v.id },
                                     { label: "OWASP", value: v.owaspCategory || "—" },
                                     { label: "Parameter", value: v.parameter || "N/A" },
-                                    { label: "Confidence", value: v.confidenceScore != null ? `${Math.round(v.confidenceScore * 100)}%` : "—" },
+                                    { label: "Confidence", value: v.confidenceScore != null ? `${Math.round(v.confidenceScore * 100)}%${v.needsManualVerification ? ' ⚠️' : ''}` : "—" },
                                   ].map((m) => (
                                     <div key={m.label} className="p-3 rounded-lg" style={glassSubtle}>
                                       <div className="text-[10px] font-semibold text-[#94A3B8] uppercase tracking-wider mb-0.5">{m.label}</div>
@@ -2018,6 +2277,13 @@ const Dashboard = () => {
                                     </div>
                                   ))}
                                 </div>
+
+                                {/* Manual verification warning */}
+                                {v.needsManualVerification && (
+                                  <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold" style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", color: "#FBBF24" }}>
+                                    <span>⚠️</span> This finding could not be fully confirmed and may be a false positive — <span className="underline">Needs Manual Verification</span>
+                                  </div>
+                                )}
 
                                 {/* Endpoint */}
                                 <div className="p-3 rounded-lg" style={glassSubtle}>

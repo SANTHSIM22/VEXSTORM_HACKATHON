@@ -4,8 +4,8 @@ const ValidationEngine = require('../engine/validationEngine');
 const { chat, analyzeResponse } = require('../llm/mistralClient');
 
 class BusinessLogicAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('BusinessLogicAgent', 'A04 - Insecure Design', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('BusinessLogicAgent', 'A04 - Insecure Design', logger, memory, findingsStore, registryRef);
         this.validator = new ValidationEngine(logger);
         this.goal = "Identify and exploit business logic flaws such as price manipulation, quantity bypass, and discount logic errors by reasoning about the application's transactional flows.";
     }
@@ -89,16 +89,42 @@ Return ONLY JSON array: [{"endpoint": "...", "reasoning": "...", "type": "price|
 
     async _testFormLogic(form, type) {
         const findings = [];
-        const payloads = type === 'price' ? ['-1', '0'] : ['0', '-1'];
-        const inputName = form.inputs.find(i => /price|amount|qty|quantity/i.test(i.name))?.name || form.inputs[0]?.name;
+        const inputName = form.inputs.find(i => /price|amount|qty|quantity|count|total|discount|credit|balance|points|rate/i.test(i.name))?.name || form.inputs[0]?.name;
 
         if (!inputName) return findings;
+
+        // Ask LLM to generate context-appropriate payloads for this specific form field
+        let payloads = [];
+        try {
+            const payloadPrompt = `You are testing a web form for business logic flaws.
+The form action is: ${form.action}
+The field being tested is: "${inputName}"
+The suspected flaw type is: ${type}
+
+Generate 3 test payloads that could exploit business logic in this field.
+Consider what this field likely represents based on its name and the endpoint.
+For numeric fields: try zero, negative, or extremely large values.
+For text fields: try empty, special boundary values, or role escalation values.
+
+Return ONLY a JSON array of payload strings, e.g.: ["0", "-1", "99999999"]`;
+            const raw = await chat("You are a business logic testing expert.", payloadPrompt);
+            const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            payloads = JSON.parse(cleaned);
+            if (!Array.isArray(payloads) || payloads.length === 0) throw new Error('invalid');
+        } catch (_) {
+            // Fallback: generic boundary payloads
+            payloads = ['0', '-1', '99999999'];
+        }
 
         for (const payload of payloads) {
             try {
                 const data = form.method === 'POST' ? { [inputName]: payload } : undefined;
                 const params = form.method === 'GET' ? { [inputName]: payload } : undefined;
                 const response = await makeRequest(form.action, { method: form.method, data, params, retries: 0 });
+
+                // Only analyze if the server actually processed the request (2xx/3xx).
+                // 4xx/5xx means the server properly rejected it — not a vulnerability.
+                if (response.status >= 400) continue;
 
                 const analysis = await analyzeResponse({
                     vulnType: 'Business Logic Flaw',
@@ -107,15 +133,15 @@ Return ONLY JSON array: [{"endpoint": "...", "reasoning": "...", "type": "price|
                     payload
                 });
 
-                if (analysis.suspicious || response.status === 200) {
+                if (analysis.suspicious) {
                     this.addFinding({
                         type: 'Insecure Design',
                         endpoint: form.action,
                         parameter: inputName,
                         description: `Business logic flaw: ${type} manipulation. ${analysis.reasoning}`,
-                        evidence: `Server accepted value "${payload}". LLM confidence: ${analysis.confidence}`,
+                        evidence: `Server accepted value "${payload}" with status ${response.status}. LLM confidence: ${analysis.confidence}`,
                         payload,
-                        confidenceScore: this._calculateConfidence({ llmConfidence: analysis.confidence || 0, llmSuspicious: !!analysis.suspicious, serverAccepted: response.status < 400, httpStatus: response.status, payloadIsNegative: payload.startsWith('-'), payloadIsZero: payload === '0', context: 'form' }),
+                        confidenceScore: this._calculateConfidence({ llmConfidence: analysis.confidence || 0, llmSuspicious: !!analysis.suspicious, serverAccepted: true, httpStatus: response.status, payloadIsNegative: String(payload).startsWith('-'), payloadIsZero: String(payload) === '0', context: 'form' }),
                         exploitScenario: `Manipulating ${type} allows bypassing business rules.`,
                         impact: 'Financial loss, data corruption',
                         reproductionSteps: [
@@ -134,32 +160,76 @@ Return ONLY JSON array: [{"endpoint": "...", "reasoning": "...", "type": "price|
 
     async _testApiLogic(api, type) {
         const findings = [];
-        const payload = type === 'price' ? { price: 0 } : { quantity: -1 };
-        try {
-            const res = await makeRequest(api, { method: 'POST', data: payload, retries: 0 });
-            const analysis = await analyzeResponse({
-                vulnType: 'Business Logic Flaw',
-                status: res.status,
-                body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data),
-                payload: JSON.stringify(payload)
-            });
 
-            if (analysis.suspicious || res.status < 400) {
-                this.addFinding({
-                    type: 'Business Logic Flaw',
-                    endpoint: api,
-                    parameter: 'JSON Body',
-                    description: `API logic manipulation of ${type}. ${analysis.reasoning}`,
-                    evidence: `Accepted ${JSON.stringify(payload)} with status ${res.status}`,
-                    payload: JSON.stringify(payload),
-                    confidenceScore: this._calculateConfidence({ llmConfidence: analysis.confidence || 0, llmSuspicious: !!analysis.suspicious, serverAccepted: res.status < 400, httpStatus: res.status, payloadIsNegative: JSON.stringify(payload).includes('-'), payloadIsZero: JSON.stringify(payload).includes(':0') || JSON.stringify(payload).includes(': 0'), context: 'api' }),
-                    exploitScenario: `Direct API manipulation of ${type} bypasses client-side checks.`,
-                    impact: 'Logic bypass',
-                    reproductionSteps: [`1. Send POST to ${api} with ${JSON.stringify(payload)}`]
+        // Ask LLM to generate context-appropriate payloads for this API endpoint
+        let payloads = [];
+        try {
+            const payloadPrompt = `You are testing an API endpoint for business logic vulnerabilities.
+Endpoint: ${api}
+
+Based on the endpoint URL, determine what this API likely does and generate 3 different
+JSON body payloads that could expose business logic flaws.
+
+Rules:
+- Infer the purpose of the endpoint from its URL path (e.g., /cart, /order, /transfer, /profile, /settings)
+- Generate payloads with field names that make sense for that endpoint
+- Test boundary conditions: zero values, negative values, extreme values, type confusion
+- Do NOT always use "price" — use fields appropriate to the endpoint's purpose
+- For auth endpoints: test role escalation (e.g., {"role":"admin"})
+- For user endpoints: test IDOR or privilege fields
+- For payment endpoints: test amount manipulation
+
+Return ONLY a JSON array of objects, e.g.:
+[{"amount": 0}, {"role": "admin"}, {"quantity": -1}]`;
+
+            const raw = await chat("You are a business logic testing expert.", payloadPrompt);
+            const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+            payloads = JSON.parse(cleaned);
+            if (!Array.isArray(payloads) || payloads.length === 0) throw new Error('invalid');
+        } catch (_) {
+            // Fallback: try a few generic boundary payloads based on the type hint from the reasoning phase
+            const typePayloads = {
+                price:    [{ price: 0 }, { price: -1 }, { amount: 0 }],
+                quantity: [{ quantity: -1 }, { quantity: 0 }, { count: 99999999 }],
+                discount: [{ discount: 100 }, { discount: -1 }, { coupon: 'FREEALL' }],
+            };
+            payloads = typePayloads[type] || [{ value: 0 }, { value: -1 }];
+        }
+
+        for (const payload of payloads) {
+            try {
+                const res = await makeRequest(api, { method: 'POST', data: payload, retries: 0 });
+
+                // Only consider it a finding if the server actually accepted the request.
+                // 4xx/5xx responses mean the server properly rejected it — NOT a vulnerability.
+                if (res.status >= 400) continue;
+
+                const payloadStr = JSON.stringify(payload);
+                const analysis = await analyzeResponse({
+                    vulnType: 'Business Logic Flaw',
+                    status: res.status,
+                    body: typeof res.data === 'string' ? res.data : JSON.stringify(res.data),
+                    payload: payloadStr
                 });
-                findings.push({ type: 'Logic Flaw', endpoint: api });
-            }
-        } catch (_) { }
+
+                if (analysis.suspicious) {
+                    this.addFinding({
+                        type: 'Business Logic Flaw',
+                        endpoint: api,
+                        parameter: 'JSON Body',
+                        description: `API logic manipulation: ${analysis.reasoning}`,
+                        evidence: `Server accepted ${payloadStr} with status ${res.status}`,
+                        payload: payloadStr,
+                        confidenceScore: this._calculateConfidence({ llmConfidence: analysis.confidence || 0, llmSuspicious: !!analysis.suspicious, serverAccepted: true, httpStatus: res.status, payloadIsNegative: payloadStr.includes('-'), payloadIsZero: /:\s*0[,}]/.test(payloadStr), context: 'api' }),
+                        exploitScenario: `Direct API manipulation bypasses client-side business logic checks.`,
+                        impact: 'Logic bypass',
+                        reproductionSteps: [`1. Send POST to ${api} with body: ${payloadStr}`, `2. Observe: server responded with HTTP ${res.status}`]
+                    });
+                    findings.push({ type: 'Logic Flaw', endpoint: api });
+                    break; // One finding per endpoint is enough
+                }
+            } catch (_) { }
+        }
         return findings;
     }
 }

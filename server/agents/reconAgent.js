@@ -5,8 +5,8 @@ const { makeRequest } = require('../utils/httpClient');
 const { MAX_DEPTH } = require('../config');
 
 class ReconAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('ReconAgent', 'Reconnaissance', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('ReconAgent', 'Reconnaissance', logger, memory, findingsStore, registryRef);
     }
 
     /**
@@ -60,21 +60,57 @@ class ReconAgent extends BaseAgent {
         const { URL } = require('url');
         const baseOrigin = new URL(target).origin;
 
+        /**
+         * Check if an HTTP response is just an SPA HTML shell (React, Angular, Next.js, etc.).
+         * SPAs return 200 with the same index.html for every route — client-side JS handles routing.
+         */
+        function isSpaHtmlShell(response) {
+            const contentType = (response.headers?.['content-type'] || '').toLowerCase();
+            const body = typeof response.data === 'string' ? response.data : '';
+            if (contentType.includes('text/html') || /^\s*<!doctype|^\s*<html|^\s*<!--/i.test(body)) return true;
+            return false;
+        }
+
+        /** Expected content validators for sensitive paths */
+        const CONTENT_VALIDATORS = {
+            '/.env': (body) => /^[A-Z_]+=.+/m.test(body) || /DB_|SECRET|KEY|PASSWORD|TOKEN/i.test(body),
+            '/.git/HEAD': (body) => /^ref:\s+refs\//.test(body.trim()),
+            '/swagger.json': (body) => { try { const j = JSON.parse(body); return !!j.swagger || !!j.openapi; } catch { return false; } },
+        };
+
         for (const path of commonPaths) {
             try {
                 const response = await makeRequest(`${baseOrigin}${path}`, { retries: 1, timeout: 5000 });
                 if (response.status === 200) {
+                    const respBody = typeof response.data === 'string' ? response.data : '';
+
+                    // Skip SPA HTML shells — these return 200 for every URL
+                    if (isSpaHtmlShell(response)) {
+                        this.logger.debug?.(`[ReconAgent] Skipping ${path} — response is HTML (SPA shell)`);
+                        // Still add to crawl URLs for non-sensitive paths like /api, /robots.txt
+                        if (!['/admin', '/debug', '/status', '/.env', '/.git/HEAD'].includes(path)) {
+                            crawlResults.urls.push(`${baseOrigin}${path}`);
+                        }
+                        continue;
+                    }
+
                     this.logger.info(`[ReconAgent] Discovered: ${path} (status: ${response.status})`);
                     crawlResults.urls.push(`${baseOrigin}${path}`);
 
                     if (['/admin', '/debug', '/status', '/.env', '/.git/HEAD'].includes(path)) {
-                        const respBody = typeof response.data === 'string' ? response.data : '';
+                        // For high-sensitivity paths, validate the content actually matches expectations
+                        const validator = CONTENT_VALIDATORS[path];
+                        if (validator && !validator(respBody)) {
+                            this.logger.debug?.(`[ReconAgent] Skipping ${path} — content doesn't match expected format`);
+                            continue;
+                        }
+
                         this.addFinding({
                             type: 'Information Disclosure',
                             endpoint: `${baseOrigin}${path}`,
                             parameter: 'N/A',
                             description: `Sensitive path ${path} is accessible (HTTP 200)`,
-                            evidence: `Status: ${response.status}`,
+                            evidence: `Status: ${response.status}, content-type: ${response.headers?.['content-type'] || 'unknown'}`,
                             confidenceScore: this._calculateConfidence({ path, statusIs200: true, contentLength: respBody.length, isHighSensitivity: ['/.env', '/.git/HEAD'].includes(path) }),
                             exploitScenario: `An attacker can access ${path} to gather sensitive information about the application`,
                             impact: 'Information disclosure may lead to further attacks',

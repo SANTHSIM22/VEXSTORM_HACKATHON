@@ -6,8 +6,8 @@ const { URL } = require('url');
 const AC_TIMEOUT = 6000;
 
 class AccessControlAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('AccessControlAgent', 'A01 - Broken Access Control', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('AccessControlAgent', 'A01 - Broken Access Control', logger, memory, findingsStore, registryRef);
         this.validator = new ValidationEngine(logger);
     }
 
@@ -170,29 +170,225 @@ class AccessControlAgent extends BaseAgent {
             } catch (_) { }
         }
 
-        // Phase 3: Forced browsing
-        const adminPaths = ['/admin', '/administrator', '/admin/dashboard', '/panel', '/manage', '/backend'];
-        for (const path of adminPaths) {
+        // ─────────────────────────────────────────────────────────────────────
+        // Phase 3: Forced Browsing — Unauthenticated Admin Access
+        //
+        // WHAT WE TEST:
+        //   We probe a set of well-known admin/management paths to check whether
+        //   the server serves real admin content to unauthenticated requests.
+        //
+        // HOW WE AVOID FALSE-POSITIVES (SPA/Next.js/React):
+        //   1. HTTP redirect detection  — we make TWO requests:
+        //        a) maxRedirects:0 → catch the raw 302/301 before it lands on a 200 login page
+        //        b) maxRedirects:5 → follow to get the final response for content inspection
+        //   2. Homepage baseline fingerprint — we fetch the root URL first and extract:
+        //        • <title> text
+        //        • root element id (root / app / __next)
+        //        • first 400 chars of <head> (meta, link tags)
+        //        • body character length
+        //      If the admin path returns a response that matches the homepage fingerprint
+        //      on ANY of these signals, it is a SPA shell → skip.
+        //   3. Embedded 404 detection — Next.js/Nuxt RSC payloads embed notFound:true
+        //      even when the HTTP status is 200.
+        //   4. Login-page detection on the visible text (after stripping <script>/<style>).
+        //   5. JSON API check — if the response is JSON and contains admin-related keys,
+        //      it is a real finding (an API does NOT return HTML shells).
+        //   6. Real admin content gate — we only report if the visible text of the page
+        //      contains server-rendered admin UI keywords AND the content is NOT on the
+        //      homepage baseline.
+        // ─────────────────────────────────────────────────────────────────────
+
+        const ADMIN_PROBE_PATHS = [
+            '/admin', '/administrator', '/admin/dashboard',
+            '/panel', '/manage', '/backend', '/cp', '/controlpanel',
+        ];
+
+        const LOGIN_INDICATORS  = /\b(login|log.?in|sign.?in|signin|forgot.?password|authenticate|sso)\b/i;
+        const ADMIN_INDICATORS  = /\b(dashboard|user.?management|system.?settings|manage.?users|control.?panel|admin.?home|analytics|audit.?log|create.?user|delete.?user|permission|role.?management)\b/i;
+        const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+
+        /** Strip <script>, <style> and all tags — leaves only server-rendered visible text. */
+        function stripToVisibleText(html) {
+            return html
+                .replace(/<script[\s\S]*?<\/script>/gi, '')
+                .replace(/<style[\s\S]*?<\/style>/gi, '')
+                .replace(/<[^>]+>/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        /** Extract a structural fingerprint from an HTML page. */
+        function fingerprint(html) {
+            const title    = (html.match(/<title[^>]*>([^<]{0,120})<\/title>/i) || [])[1]?.trim().toLowerCase() || '';
+            const rootEl   = (html.match(/<(?:div|main)[^>]+id=["'](?:root|app|__next|__nuxt)[^"']*["']/i) || [])[0] || '';
+            const headSnip = (html.match(/<head[\s\S]*?<\/head>/i) || [''])[0].slice(0, 400);
+            return { title, rootEl, headSnip, len: html.length };
+        }
+
+        /** Returns true if the candidate response looks like the same SPA shell as the homepage. */
+        function isSameSpaShell(homeFp, candidateHtml) {
+            const fp = fingerprint(candidateHtml);
+            if (homeFp.title && fp.title && homeFp.title === fp.title)             return true;
+            if (homeFp.rootEl && fp.rootEl && homeFp.rootEl === fp.rootEl)         return true;
+            if (homeFp.headSnip.length > 80 && fp.headSnip.length > 80
+                && homeFp.headSnip.slice(0, 200) === fp.headSnip.slice(0, 200))    return true;
+            if (homeFp.len > 0) {
+                const ratio = fp.len / homeFp.len;
+                if (ratio >= 0.92 && ratio <= 1.08)                                return true;
+            }
+            return false;
+        }
+
+        /** Next.js / Nuxt embed 404 data in RSC payloads even on HTTP 200. */
+        function hasEmbedded404(html) {
+            return /["']notFound["']\s*:\s*\[/.test(html)
+                || /404[:\s]+This page could not be found/i.test(html)
+                || /<title[^>]*>\s*404\b/i.test(html)
+                || /\bPage Not Found\b/i.test(stripToVisibleText(html).slice(0, 300));
+        }
+
+        // ── Step 1: Fetch homepage baseline ──────────────────────────────────
+        let homeFp = { title: '', rootEl: '', headSnip: '', len: 0 };
+        try {
+            const homeResp = await makeRequest(baseOrigin, { retries: 1, timeout: AC_TIMEOUT });
+            const homeBody = typeof homeResp.data === 'string' ? homeResp.data : '';
+            homeFp = fingerprint(homeBody);
+            this.logger.info(`[AccessControlAgent] Homepage fingerprint — title:"${homeFp.title}" len:${homeFp.len}`);
+        } catch (_) {
+            this.logger.warn('[AccessControlAgent] Could not fetch homepage baseline for SPA detection');
+        }
+
+        // ── Step 2: Probe each admin path ────────────────────────────────────
+        for (const path of ADMIN_PROBE_PATHS) {
+            const probeUrl = `${baseOrigin}${path}`;
             try {
-                const response = await makeRequest(`${baseOrigin}${path}`, { retries: 1, timeout: AC_TIMEOUT });
-                if (response.status === 200) {
-                    const respBody = typeof response.data === 'string' ? response.data : '';
-                    this.addFinding({
-                        type: 'Broken Access Control',
-                        endpoint: `${baseOrigin}${path}`,
-                        parameter: 'N/A',
-                        description: `Admin path "${path}" accessible without authentication`,
-                        evidence: `HTTP 200 response on ${path}`,
-                        confidenceScore: this._calculateConfidence({ vulnType: 'forcedBrowsing', statusIs200: true, contentLength: respBody.length, paramNameRelevant: /admin|manage|backend/i.test(path) }),
-                        exploitScenario: `Attacker accesses ${path} without authentication`,
-                        impact: 'Unauthorized admin access',
-                        reproductionSteps: [
-                            `1. Open in browser (without logging in): ${baseOrigin}${path}`,
-                            `2. Observe: the page loads successfully (HTTP 200)`,
-                            `3. Admin functionality is accessible without authentication`,
-                        ],
-                    });
+                // ── 2a. Raw request (no redirects) to detect server-level auth redirects ──
+                let rawStatus = null;
+                let redirectTarget = '';
+                try {
+                    const rawResp = await makeRequest(probeUrl, { retries: 1, timeout: AC_TIMEOUT, maxRedirects: 0 });
+                    rawStatus = rawResp.status;
+                    redirectTarget = (rawResp.headers?.location || '').toLowerCase();
+                } catch (redirectErr) {
+                    // axios throws on 3xx when maxRedirects:0 — extract status from error
+                    rawStatus = redirectErr?.response?.status ?? null;
+                    redirectTarget = (redirectErr?.response?.headers?.location || '').toLowerCase();
                 }
+
+                // Server immediately redirects → protected by server-side auth
+                if (rawStatus && REDIRECT_STATUSES.has(rawStatus)) {
+                    this.logger.info(`[AccessControlAgent] ${path} — server redirects (${rawStatus} → ${redirectTarget || '?'}) — PROTECTED`);
+                    continue;
+                }
+
+                // ── 2b. Follow redirects to get final response ──
+                const response = await makeRequest(probeUrl, { retries: 1, timeout: AC_TIMEOUT });
+                const finalUrl = (response.finalUrl || response.url || probeUrl).toLowerCase();
+                const status   = response.status;
+
+                // Not a 200 → not accessible
+                if (status !== 200) {
+                    this.logger.info(`[AccessControlAgent] ${path} — HTTP ${status} — NOT ACCESSIBLE`);
+                    continue;
+                }
+
+                const respBody = typeof response.data === 'string' ? response.data : '';
+                const contentType = (response.headers?.['content-type'] || '').toLowerCase();
+
+                // ── 2c. JSON API response check ──────────────────────────────────────────
+                // An API endpoint returning JSON admin data without auth is a real finding.
+                if (contentType.includes('application/json') || (respBody.trimStart().startsWith('{') || respBody.trimStart().startsWith('['))) {
+                    try {
+                        const parsed = typeof respBody === 'string' ? JSON.parse(respBody) : respBody;
+                        const jsonStr = JSON.stringify(parsed).toLowerCase();
+                        if (/user|admin|role|permission|email|token|secret/i.test(jsonStr) && jsonStr.length > 50) {
+                            const excerpt = JSON.stringify(parsed).slice(0, 200);
+                            this.addFinding({
+                                type: 'Broken Access Control',
+                                endpoint: probeUrl,
+                                parameter: 'N/A',
+                                description: `Admin API endpoint "${path}" returns sensitive JSON data without authentication`,
+                                evidence: `HTTP 200 · Content-Type: application/json · Response excerpt: ${excerpt}`,
+                                confidenceScore: 0.85,
+                                exploitScenario: `An unauthenticated attacker sends GET ${probeUrl} and receives admin/user data in JSON`,
+                                impact: 'Direct data exposure — user records, roles, tokens accessible without login',
+                                reproductionSteps: [
+                                    `1. Run: curl -s "${probeUrl}"`,
+                                    `2. Observe: server returns HTTP 200 with JSON containing sensitive fields`,
+                                    `3. No authentication header or cookie is required`,
+                                ],
+                            });
+                        }
+                    } catch (_) {}
+                    continue;
+                }
+
+                // ── 2d. HTML response — SPA/CSR detection ────────────────────────────────
+
+                // Redirect followed to a login URL → server enforces auth via redirect
+                if (finalUrl !== probeUrl.toLowerCase() && LOGIN_INDICATORS.test(finalUrl)) {
+                    this.logger.info(`[AccessControlAgent] ${path} — redirected to login (${finalUrl}) — PROTECTED`);
+                    continue;
+                }
+
+                // Embedded 404 in RSC payload (Next.js notFound:true)
+                if (hasEmbedded404(respBody)) {
+                    this.logger.info(`[AccessControlAgent] ${path} — embedded 404 in RSC payload — NOT ACCESSIBLE`);
+                    continue;
+                }
+
+                // SPA shell comparison against homepage baseline
+                if (isSameSpaShell(homeFp, respBody)) {
+                    this.logger.info(`[AccessControlAgent] ${path} — response matches homepage SPA shell — NOT A REAL ADMIN PAGE`);
+                    continue;
+                }
+
+                // ── 2e. Real content gate ─────────────────────────────────────────────────
+                const visibleText = stripToVisibleText(respBody);
+
+                // Login page detected in visible text
+                const isLoginPage = LOGIN_INDICATORS.test(visibleText)
+                    && /(<form|type=["']?password)/i.test(respBody)
+                    && !ADMIN_INDICATORS.test(visibleText);
+                if (isLoginPage) {
+                    this.logger.info(`[AccessControlAgent] ${path} — login form in visible body — PROTECTED`);
+                    continue;
+                }
+
+                // Must have REAL admin UI keywords in server-rendered visible text
+                const hasRealAdminContent = ADMIN_INDICATORS.test(visibleText) && visibleText.length > 300;
+                if (!hasRealAdminContent) {
+                    this.logger.info(`[AccessControlAgent] ${path} — no server-rendered admin content in visible text — skipping`);
+                    continue;
+                }
+
+                // ── 2f. Confirmed: real admin content accessible without auth ─────────────
+                const contentExcerpt = visibleText.slice(0, 200).replace(/\s+/g, ' ');
+                const confidence = Math.min(1.0, this._calculateConfidence({
+                    vulnType: 'forcedBrowsing',
+                    statusIs200: true,
+                    contentLength: visibleText.length,
+                    paramNameRelevant: /admin|manage|backend/i.test(path),
+                }) + 0.2); // +0.2 because we confirmed real admin content in visible text
+
+                this.addFinding({
+                    type: 'Broken Access Control',
+                    endpoint: probeUrl,
+                    parameter: 'N/A',
+                    description: `Admin panel at "${path}" is accessible without authentication — server-rendered admin UI confirmed`,
+                    evidence: `HTTP 200 · No redirect · Real admin content in server-rendered HTML: "${contentExcerpt}"`,
+                    confidenceScore: confidence,
+                    exploitScenario: `Attacker navigates to ${probeUrl} in a browser without logging in and sees live admin functionality`,
+                    impact: 'Full unauthorized admin access — attacker can view, modify, or delete application data',
+                    reproductionSteps: [
+                        `1. Open a private/incognito browser window (no session cookies)`,
+                        `2. Navigate to: ${probeUrl}`,
+                        `3. Observe: the admin UI loads without being redirected to a login page`,
+                        `4. Server-rendered page contains admin keywords: visible text excerpt: "${contentExcerpt.slice(0, 100)}"`,
+                    ],
+                });
+                this.logger.warn(`[AccessControlAgent] CONFIRMED: ${path} accessible without auth — visible admin content found`);
+
             } catch (_) { }
         }
 

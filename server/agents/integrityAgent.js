@@ -3,8 +3,8 @@ const { makeRequest } = require('../utils/httpClient');
 const cheerio = require('cheerio');
 
 class IntegrityAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('IntegrityAgent', 'A08 - Software & Data Integrity Failures', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('IntegrityAgent', 'A08 - Software & Data Integrity Failures', logger, memory, findingsStore, registryRef);
     }
 
     /**

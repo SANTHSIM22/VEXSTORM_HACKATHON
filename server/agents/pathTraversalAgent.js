@@ -2,8 +2,8 @@ const BaseAgent = require('./baseAgent');
 const { makeRequest } = require('../utils/httpClient');
 
 class PathTraversalAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('PathTraversalAgent', 'A03 - Injection & Insecure Resource Access', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('PathTraversalAgent', 'A03 - Injection & Insecure Resource Access', logger, memory, findingsStore, registryRef);
         this.goal = "Identify Path Traversal (LFI) and insecure File Upload vulnerabilities by testing file-related parameters and upload forms.";
     }
 
