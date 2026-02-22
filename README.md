@@ -18,8 +18,22 @@
   <p>
     ZeroTrace is an end-to-end AI-powered security platform that scans codebases, web targets, and GitHub repositories for vulnerabilities — from your editor, your browser, or the command line.
   </p>
-  <p>
-  <strong>Live Deployment:</strong><br/>
+<p>
+  <strong>Live Deployments</strong><br/><br/>
+
+  <strong>Frontend (Primary):</strong><br/>
+  <a href="http://hackathon.acrossthe.cloud/" target="_blank">
+    http://hackathon.acrossthe.cloud/
+  </a>
+  <br/><br/>
+
+  <strong>Frontend (Render Mirror):</strong><br/>
+  <a href="https://vexstorm-hackathon-1.onrender.com/" target="_blank">
+    https://vexstorm-hackathon-1.onrender.com/
+  </a>
+  <br/><br/>
+
+  <strong>Backend API:</strong><br/>
   <a href="https://vexstorm-hackathon-2.onrender.com/" target="_blank">
     https://vexstorm-hackathon-2.onrender.com/
   </a>
