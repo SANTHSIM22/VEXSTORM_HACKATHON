@@ -69,11 +69,11 @@ const STATS = [
 
 /* ── Glass presets ── */
 const glass = {
-  background: "rgba(255,255,255,0.04)",
+  background: "rgba(88,28,135,0.12)",
   backdropFilter: "blur(20px)",
   WebkitBackdropFilter: "blur(20px)",
-  border: "1px solid rgba(255,255,255,0.07)",
-  boxShadow: "0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)",
+  border: "1px solid rgba(168,85,247,0.18)",
+  boxShadow: "0 8px 32px rgba(88,28,135,0.2), inset 0 1px 0 rgba(255,255,255,0.06)",
 };
 
 const glassHover = {
@@ -84,7 +84,7 @@ const glassHover = {
 
 const glassSubtle = {
   background: "rgba(255,255,255,0.03)",
-  border: "1px solid rgba(255,255,255,0.05)",
+  border: "1px solid rgba(168,85,247,0.1)",
 };
 
 const Landing = () => {
@@ -173,7 +173,7 @@ const Landing = () => {
   }, []);
 
   return (
-    <div className="relative min-h-screen text-[#F9FAFB] overflow-x-hidden" style={{ background: "#060910" }}>
+    <div className="relative min-h-screen text-[#f3e8ff] overflow-x-hidden" style={{ background: "linear-gradient(135deg, #000000 0%, #0d0015 40%, #1a0030 70%, #0d0015 100%)", backgroundAttachment: "fixed" }}>
 
       {/* ── Keyframes ── */}
       <style>{`
@@ -272,17 +272,17 @@ const Landing = () => {
         .slide-right.visible{opacity:1;transform:translateX(0)}
 
         .glass-card{
-          background:rgba(255,255,255,0.03);
+          background:rgba(88,28,135,0.12);
           backdrop-filter:blur(20px);
           -webkit-backdrop-filter:blur(20px);
-          border:1px solid rgba(255,255,255,0.06);
-          box-shadow:0 8px 32px rgba(0,0,0,0.25),inset 0 1px 0 rgba(255,255,255,0.04);
+          border:1px solid rgba(168,85,247,0.18);
+          box-shadow:0 8px 32px rgba(88,28,135,0.2),inset 0 1px 0 rgba(255,255,255,0.06);
           transition:background 0.35s ease,border-color 0.35s ease,box-shadow 0.35s ease,transform 0.35s cubic-bezier(0.16,1,0.3,1),opacity 0.8s cubic-bezier(0.16,1,0.3,1),translateY 0.8s cubic-bezier(0.16,1,0.3,1);
         }
         .glass-card:hover{
-          background:rgba(255,255,255,0.06);
-          border-color:rgba(124,58,237,0.2);
-          box-shadow:0 16px 48px rgba(124,58,237,0.12),inset 0 1px 0 rgba(255,255,255,0.08);
+          background:rgba(88,28,135,0.18);
+          border-color:rgba(168,85,247,0.3);
+          box-shadow:0 16px 48px rgba(124,58,237,0.15),inset 0 1px 0 rgba(255,255,255,0.08);
           transform:translateY(-4px);
           transition-delay:0s !important;
         }
@@ -319,8 +319,8 @@ const Landing = () => {
           transition:all 0.3s cubic-bezier(0.16,1,0.3,1);
         }
         .cta-secondary:hover{
-          background:rgba(255,255,255,0.08) !important;
-          border-color:rgba(255,255,255,0.15) !important;
+          background:rgba(88,28,135,0.18) !important;
+          border-color:rgba(168,85,247,0.25) !important;
           transform:translateY(-2px);
         }
 
@@ -328,8 +328,8 @@ const Landing = () => {
           transition:all 0.4s cubic-bezier(0.16,1,0.3,1);
         }
         .step-card:hover{
-          background:rgba(255,255,255,0.06);
-          border-color:rgba(124,58,237,0.2);
+          background:rgba(88,28,135,0.18);
+          border-color:rgba(168,85,247,0.3);
           transform:translateY(-6px);
         }
         .step-card:hover .step-icon{
@@ -345,7 +345,7 @@ const Landing = () => {
           transition:all 0.3s ease;
         }
         .stat-cell:hover{
-          background:rgba(255,255,255,0.03);
+          background:rgba(88,28,135,0.12);
         }
         .stat-cell::after{
           content:'';
@@ -355,7 +355,7 @@ const Landing = () => {
           transform:translateX(-50%) scaleX(0);
           width:40px;
           height:2px;
-          background:linear-gradient(90deg,#7C3AED,#3B82F6);
+          background:linear-gradient(90deg,#c084fc,#a855f7);
           border-radius:1px;
           transition:transform 0.3s ease;
         }
@@ -364,15 +364,15 @@ const Landing = () => {
         }
 
         .nav-glass{
-          background:rgba(6,9,16,0.7);
+          background:rgba(5,0,8,0.85);
           backdrop-filter:blur(20px);
           -webkit-backdrop-filter:blur(20px);
-          border-bottom:1px solid rgba(255,255,255,0.05);
+          border-bottom:1px solid rgba(168,85,247,0.12);
         }
 
         .glow-line{
           height:1px;
-          background:linear-gradient(90deg,transparent,rgba(124,58,237,0.3),rgba(59,130,246,0.3),transparent);
+          background:linear-gradient(90deg,transparent,rgba(168,85,247,0.3),rgba(124,58,237,0.3),transparent);
         }
       `}</style>
 
@@ -395,7 +395,7 @@ const Landing = () => {
         />
         <div
           className="absolute top-[40%] -right-[20%] w-[600px] h-[600px] rounded-full orb-2"
-          style={{ background: "radial-gradient(circle,rgba(59,130,246,0.08) 0%,transparent 65%)", filter: "blur(80px)" }}
+          style={{ background: "radial-gradient(circle,rgba(168,85,247,0.08) 0%,transparent 65%)", filter: "blur(80px)" }}
         />
         <div
           className="absolute -bottom-[25%] left-[30%] w-[700px] h-[700px] rounded-full orb-3"
@@ -410,15 +410,15 @@ const Landing = () => {
             <div className="transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12">
               <img src="/logo.png" width={36} height={36} alt="Zero Trace" className="object-contain" />
             </div>
-            <span className="brand-name text-sm text-[#F9FAFB]">
-              ZERO<span className="bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent">TRACE</span>
+            <span className="brand-name text-sm text-[#f3e8ff]">
+              ZERO<span className="bg-gradient-to-r from-[#c084fc] to-[#a855f7] bg-clip-text text-transparent">TRACE</span>
             </span>
           </Link>
           <div className="flex items-center gap-3">
             {user ? (
               <Link to="/dashboard"
                 className="cta-btn inline-flex items-center gap-2 px-5 py-2 rounded-lg font-semibold text-sm text-white"
-                style={{ background: "linear-gradient(135deg,#7C3AED,#3B82F6)" }}>
+                style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)" }}>
                 Dashboard <ArrowRight size={14} />
               </Link>
             ) : (
@@ -429,7 +429,7 @@ const Landing = () => {
                 </Link>
                 <Link to="/signup"
                   className="cta-btn inline-flex items-center gap-2 px-5 py-2 rounded-lg font-semibold text-sm text-white"
-                  style={{ background: "linear-gradient(135deg,#7C3AED,#3B82F6)" }}>
+                  style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)" }}>
                   Get Started <ArrowRight size={14} />
                 </Link>
               </>
@@ -453,13 +453,13 @@ const Landing = () => {
             </div>
 
             {/* Headline */}
-            <h1 className="text-5xl md:text-6xl xl:text-7xl font-extrabold leading-[1.06] tracking-tight mb-7 text-[#F9FAFB]">
+            <h1 className="text-5xl md:text-6xl xl:text-7xl font-extrabold leading-[1.06] tracking-tight mb-7 text-[#f3e8ff]">
               Your Code Has<br />
-              <span className="bg-gradient-to-r from-[#7C3AED] via-[#6366F1] to-[#3B82F6] bg-clip-text text-transparent gradient-shift">
+              <span className="bg-gradient-to-r from-[#c084fc] via-[#a855f7] to-[#7c3aed] bg-clip-text text-transparent gradient-shift">
                 Hidden Threats.
               </span><br />
               We Find{" "}
-              <span className="bg-gradient-to-r from-[#7C3AED] via-[#6366F1] to-[#3B82F6] bg-clip-text text-transparent gradient-shift">
+              <span className="bg-gradient-to-r from-[#c084fc] via-[#a855f7] to-[#7c3aed] bg-clip-text text-transparent gradient-shift">
                 All of Them.
               </span>
             </h1>
@@ -476,14 +476,14 @@ const Landing = () => {
               {user ? (
                 <Link to="/dashboard"
                   className="cta-btn inline-flex items-center gap-2.5 px-9 py-4 rounded-xl font-semibold text-sm tracking-wide text-white"
-                  style={{ background: "linear-gradient(135deg,#7C3AED,#3B82F6)" }}>
+                  style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)" }}>
                   Open Dashboard <ArrowRight size={16} />
                 </Link>
               ) : (
                 <>
                   <Link to="/signup"
                     className="cta-btn inline-flex items-center gap-2.5 px-9 py-4 rounded-xl font-semibold text-sm tracking-wide text-white"
-                    style={{ background: "linear-gradient(135deg,#7C3AED,#3B82F6)" }}>
+                    style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)" }}>
                     Start Free Scan <ArrowRight size={16} />
                   </Link>
                   <Link to="/login"
@@ -503,7 +503,7 @@ const Landing = () => {
                 { val: "10+", lbl: "AI Agents" },
               ].map((s, i) => (
                 <div key={i} className="flex flex-col gap-1 group cursor-default">
-                  <span className="text-2xl font-extrabold bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent transition-transform duration-300 group-hover:scale-110 inline-block origin-left">
+                  <span className="text-2xl font-extrabold bg-gradient-to-r from-[#c084fc] to-[#a855f7] bg-clip-text text-transparent transition-transform duration-300 group-hover:scale-110 inline-block origin-left">
                     {s.val}
                   </span>
                   <span className="text-[11px] text-[#64748B] group-hover:text-[#94A3B8] transition-colors duration-300">{s.lbl}</span>
@@ -524,7 +524,7 @@ const Landing = () => {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <p className="text-[10px] text-[#64748B] mb-1 font-mono uppercase tracking-widest">ZeroTrace Agent</p>
-                  <p className="text-sm font-bold text-[#F9FAFB]">Live Threat Dashboard</p>
+                  <p className="text-sm font-bold text-[#f3e8ff]">Live Threat Dashboard</p>
                 </div>
                 <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={glassSubtle}>
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 scan-pulse" />
@@ -534,20 +534,20 @@ const Landing = () => {
 
               {/* Scan progress */}
               <div className="rounded-xl p-4 mb-4 relative overflow-hidden"
-                style={{ background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(168,85,247,0.15)" }}>
                 {/* Shimmer overlay */}
                 <div className="absolute inset-0 shimmer" />
                 <p className="text-[10px] text-[#64748B] mb-1.5 font-mono uppercase tracking-widest relative z-10">Scan in Progress</p>
-                <p className="flex items-center gap-2 text-base font-extrabold text-[#F9FAFB] font-mono mb-3 relative z-10">
+                <p className="flex items-center gap-2 text-base font-extrabold text-[#f3e8ff] font-mono mb-3 relative z-10">
                   <FileCode size={15} className="text-[#7C3AED]" />
                   src/auth/
                   <span className="flex items-center gap-1 text-red-400 text-sm">
                     <ShieldAlert size={14} /> 3 Critical
                   </span>
                 </p>
-                <div className="h-1.5 rounded-full mb-2 relative z-10" style={{ background: "rgba(255,255,255,0.06)" }}>
+                <div className="h-1.5 rounded-full mb-2 relative z-10" style={{ background: "rgba(168,85,247,0.15)" }}>
                   <div className="h-full rounded-full progress-pulse relative overflow-hidden"
-                    style={{ background: "linear-gradient(90deg,#7C3AED,#3B82F6)", width: "72%" }}>
+                    style={{ background: "linear-gradient(90deg,#a855f7,#7c3aed)", width: "72%" }}>
                     <div className="absolute inset-0 shimmer" style={{
                       background: "linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)",
                       backgroundSize: "200% 100%",
@@ -581,7 +581,7 @@ const Landing = () => {
 
               {/* Agent log */}
               <div className="rounded-xl px-4 py-3.5 font-mono text-xs mb-4"
-                style={{ background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.03)" }}>
+                style={{ background: "rgba(0,0,0,0.35)", border: "1px solid rgba(168,85,247,0.1)" }}>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-[#4B5563]">[00:03]</span>
                   <span className="text-[#F87171] font-semibold flex items-center gap-1"><GitCommitHorizontal size={10} /> ATTACKER</span>
@@ -590,7 +590,7 @@ const Landing = () => {
                 <div className="flex items-center gap-2">
                   <span className="text-[#4B5563]">[00:05]</span>
                   <span className="text-[#7C3AED] font-semibold flex items-center gap-1"><GitCommitHorizontal size={10} /> PATCHER</span>
-                  <span className="text-[#94A3B8]">Generating fix…<span className="text-[#3B82F6] cursor-blink">▊</span></span>
+                  <span className="text-[#94A3B8]">Generating fix…<span className="text-[#a855f7] cursor-blink">▊</span></span>
                 </div>
               </div>
 
@@ -602,17 +602,17 @@ const Landing = () => {
                 <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg transition-all duration-300 hover:bg-white/[0.04]"
                   style={glassSubtle}>
                   <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white"
-                    style={{ background: "linear-gradient(135deg,#7C3AED,#3B82F6)" }}>
+                    style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)" }}>
                     <PackageCheck size={14} />
                   </div>
                   <div>
                     <p className="text-[10px] text-[#64748B]">Patch Ready</p>
-                    <p className="text-xs font-semibold text-[#F9FAFB]">0 regressions</p>
+                    <p className="text-xs font-semibold text-[#f3e8ff]">0 regressions</p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] text-[#64748B] mb-1">Threat Score</p>
-                  <p className="text-2xl font-extrabold bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent">
+                  <p className="text-2xl font-extrabold bg-gradient-to-r from-[#c084fc] to-[#a855f7] bg-clip-text text-transparent">
                     6.7<span className="text-sm text-[#64748B] ml-0.5">/ 10</span>
                   </p>
                 </div>
@@ -630,9 +630,9 @@ const Landing = () => {
             <div className="absolute -bottom-4 -right-5 px-3.5 py-2 rounded-full text-[11px] font-semibold flex items-center gap-1.5 text-[#CBD5E1] badge-2"
               style={{
                 ...glass,
-                boxShadow: "0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(59,130,246,0.1)",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.4), 0 0 20px rgba(168,85,247,0.1)",
               }}>
-              <Users size={12} className="text-[#3B82F6]" /> 10+ Agents Active
+              <Users size={12} className="text-[#a855f7]" /> 10+ Agents Active
             </div>
           </div>
 
@@ -654,8 +654,8 @@ const Landing = () => {
             {STATS.map((s, i) => (
               <div key={i}
                 className={`py-12 text-center stat-cell ${i < STATS.length - 1 ? "border-r" : ""}`}
-                style={{ borderColor: "rgba(255,255,255,0.05)" }}>
-                <div className="text-4xl font-extrabold bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent mb-2">
+                style={{ borderColor: "rgba(168,85,247,0.12)" }}>
+                <div className="text-4xl font-extrabold bg-gradient-to-r from-[#c084fc] to-[#a855f7] bg-clip-text text-transparent mb-2">
                   <AnimatedValue value={s.value} inView={statsInView} />
                 </div>
                 <div className="text-[11px] text-[#64748B] font-medium tracking-wide">{s.label}</div>
@@ -671,9 +671,9 @@ const Landing = () => {
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5 text-[10px] font-semibold tracking-[0.2em] text-[#CBD5E1] uppercase" style={glass}>
             <Lightbulb size={12} className="text-[#7C3AED]" /> Capabilities
           </div>
-          <h2 className="text-4xl md:text-5xl font-extrabold mb-5 text-[#F9FAFB] leading-tight">
+          <h2 className="text-4xl md:text-5xl font-extrabold mb-5 text-[#f3e8ff] leading-tight">
             Built for the{" "}
-            <span className="bg-gradient-to-r from-[#7C3AED] via-[#6366F1] to-[#3B82F6] bg-clip-text text-transparent">Most Complex</span>{" "}
+            <span className="bg-gradient-to-r from-[#c084fc] via-[#a855f7] to-[#7c3aed] bg-clip-text text-transparent">Most Complex</span>{" "}
             Threats
           </h2>
           <p className="text-[#94A3B8] max-w-lg mx-auto text-base leading-relaxed">
@@ -688,16 +688,16 @@ const Landing = () => {
               <div
                 key={i}
                 className="glass-card flex-shrink-0 w-72 mx-3 rounded-2xl overflow-hidden cursor-default transition-all duration-300"
-                style={{ border: "1px solid rgba(255,255,255,0.07)" }}
-                onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 0 20px rgba(124,58,237,0.25), 0 8px 32px rgba(0,0,0,0.2)"}
+                style={{ border: "1px solid rgba(168,85,247,0.18)" }}
+                onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 0 20px rgba(168,85,247,0.3), 0 8px 32px rgba(88,28,135,0.2)"}
                 onMouseLeave={(e) => e.currentTarget.style.boxShadow = "none"}
               >
                 {/* Icon banner */}
                 <div
                   className="h-36 flex items-center justify-center"
                   style={{
-                    background: "linear-gradient(135deg,rgba(124,58,237,0.15),rgba(59,130,246,0.1))",
-                    borderBottom: "1px solid rgba(255,255,255,0.06)",
+                    background: "linear-gradient(135deg,rgba(168,85,247,0.15),rgba(124,58,237,0.1))",
+                    borderBottom: "1px solid rgba(168,85,247,0.15)",
                   }}
                 >
                   <div
@@ -709,7 +709,7 @@ const Landing = () => {
                 </div>
                 {/* Text */}
                 <div className="p-5">
-                  <h3 className="text-[14px] font-bold text-[#F9FAFB] mb-2">{f.title}</h3>
+                  <h3 className="text-[14px] font-bold text-[#f3e8ff] mb-2">{f.title}</h3>
                   <p className="text-xs text-[#94A3B8] leading-relaxed">{f.desc}</p>
                 </div>
               </div>
@@ -727,11 +727,11 @@ const Landing = () => {
       <section ref={howRef} className="relative z-10 py-28 px-6 ">
         <div className={`max-w-6xl mx-auto text-center mb-16 fade-up ${howInView ? "visible" : ""}`}>
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5 text-[10px] font-semibold tracking-[0.2em] text-[#CBD5E1] uppercase" style={glass}>
-            <Workflow size={12} className="text-[#3B82F6]" /> How It Works
+            <Workflow size={12} className="text-[#a855f7]" /> How It Works
           </div>
-          <h2 className="text-4xl md:text-5xl font-extrabold text-[#F9FAFB] leading-tight">
+          <h2 className="text-4xl md:text-5xl font-extrabold text-[#f3e8ff] leading-tight">
             10 Agents.{" "}
-            <span className="bg-gradient-to-r from-[#7C3AED] via-[#6366F1] to-[#3B82F6] bg-clip-text text-transparent">One Misson.</span>
+            <span className="bg-gradient-to-r from-[#c084fc] via-[#a855f7] to-[#7c3aed] bg-clip-text text-transparent">One Misson.</span>
           </h2>
           <p className="text-[#94A3B8] max-w-lg mx-auto text-base leading-relaxed mt-4">
             Hover over each node to discover what every agent does in the security pipeline.
@@ -743,7 +743,7 @@ const Landing = () => {
           const AGENTS = [
             { icon: <FileCode size={18} />,    title: "FILE SCAN",    color: "#7C3AED", desc: "Discovers & indexes all relevant source files in the workspace for the pipeline." },
             { icon: <Search size={18} />,       title: "PATTERN",      color: "#6366F1", desc: "Regex-based detection of hardcoded secrets, unsafe functions, SQLi, XSS & CMDi." },
-            { icon: <Lock size={18} />,          title: "AUTH",         color: "#3B82F6", desc: "JWT misuse, missing auth guards, session management flaws & RBAC bypass detection." },
+            { icon: <Lock size={18} />,          title: "AUTH",         color: "#a855f7", desc: "JWT misuse, missing auth guards, session management flaws & RBAC bypass detection." },
             { icon: <ShieldAlert size={18} />,   title: "BIZ LOGIC",   color: "#8B5CF6", desc: "IDOR, privilege escalation, mass assignment & insecure direct object references." },
             { icon: <Globe size={18} />,         title: "API SEC",     color: "#0EA5E9", desc: "Unprotected endpoints, GraphQL introspection & broken object-level authorization." },
             { icon: <Monitor size={18} />,      title: "FRONTEND",    color: "#06B6D4", desc: "Missing CSP headers, unsafe HTML sinks, open redirects & client-side XSS vectors." },
@@ -998,9 +998,9 @@ const Landing = () => {
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5 text-[10px] font-semibold tracking-[0.2em] text-[#CBD5E1] uppercase" style={glass}>
               <Monitor size={12} className="text-[#7C3AED]" /> VS Code Extension
             </div>
-            <h2 className="text-4xl md:text-5xl font-extrabold text-[#F9FAFB] leading-tight mb-5">
+            <h2 className="text-4xl md:text-5xl font-extrabold text-[#f3e8ff] leading-tight mb-5">
               Security Scanning{" "}
-              <span className="bg-gradient-to-r from-[#7C3AED] via-[#6366F1] to-[#3B82F6] bg-clip-text text-transparent">Inside Your Editor</span>
+              <span className="bg-gradient-to-r from-[#c084fc] via-[#a855f7] to-[#7c3aed] bg-clip-text text-transparent">Inside Your Editor</span>
             </h2>
             <p className="text-[#94A3B8] max-w-2xl mx-auto text-base leading-relaxed">
               ZeroTrace deploys 10 specialized AI agents directly in VS Code — powered by Mistral AI and LangGraph.Scan your entire codebase in seconds. Get AI-powered insights with proof-of-exploitation payloads and remediation code.</p>
@@ -1008,8 +1008,8 @@ const Landing = () => {
 
           {/* Interactive Report Features as Separate Cards */}
           <div className="mb-16">
-            <h3 className="text-lg font-bold text-[#F9FAFB] mb-8 flex items-center gap-2">
-              <BarChart3 size={18} className="text-[#3B82F6]" /> Interactive Report Features
+            <h3 className="text-lg font-bold text-[#f3e8ff] mb-8 flex items-center gap-2">
+              <BarChart3 size={18} className="text-[#a855f7]" /> Interactive Report Features
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {[
@@ -1028,15 +1028,15 @@ const Landing = () => {
                     boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
                     border: "1px solid rgba(99,102,241,0.3)"
                   }}
-                  onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 0 25px rgba(99,102,241,0.3), 0 8px 24px rgba(0,0,0,0.15)"}
-                  onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 8px 32px rgba(0,0,0,0.2)"}
+                  onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 0 25px rgba(168,85,247,0.3), 0 8px 24px rgba(88,28,135,0.2)"}
+                  onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 8px 32px rgba(88,28,135,0.2)"}
                 >
                   <div className="flex items-start gap-4">
                     <div className="shrink-0">
                       <CheckCircle2 size={24} className="text-[#10B981]" />
                     </div>
                     <div>
-                      <h4 className="font-bold text-[#F9FAFB] mb-2">{item.title}</h4>
+                      <h4 className="font-bold text-[#f3e8ff] mb-2">{item.title}</h4>
                       <p className="text-sm text-[#CBD5E1] leading-relaxed">{item.desc}</p>
                     </div>
                   </div>
@@ -1053,9 +1053,9 @@ const Landing = () => {
               rel="noopener noreferrer"
               className="px-8 py-3 rounded-xl font-semibold text-sm transition-all duration-300 flex items-center gap-2 group"
               style={{
-                background: "linear-gradient(135deg, #7C3AED 0%, #6366F1 100%)",
-                color: "#F9FAFB",
-                boxShadow: "0 8px 24px rgba(124,58,237,0.4)",
+                background: "linear-gradient(135deg, #a855f7 0%, #7c3aed 100%)",
+                color: "#f3e8ff",
+                boxShadow: "0 8px 24px rgba(168,85,247,0.4)",
               }}
             >
               <Download size={16} />
@@ -1089,7 +1089,7 @@ const Landing = () => {
       <section ref={ctaRef} className={`relative z-10 py-36 px-6 text-center overflow-hidden scale-in ${ctaInView ? "visible" : ""}`}>
         {/* Full-section grid background */}
         <div className="absolute inset-0 pointer-events-none" style={{
-          backgroundImage: `linear-gradient(rgba(124,58,237,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(124,58,237,0.12) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(rgba(168,85,247,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(168,85,247,0.12) 1px, transparent 1px)`,
           backgroundSize: "60px 60px",
         }} />
         {/* Center glow */}
@@ -1102,9 +1102,9 @@ const Landing = () => {
             style={glassSubtle}>
             <Rocket size={12} className="text-[#7C3AED]" /> Get Started Today
           </div>
-          <h2 className="text-4xl md:text-5xl font-extrabold mb-5 text-[#F9FAFB] leading-tight">
+          <h2 className="text-4xl md:text-5xl font-extrabold mb-5 text-[#f3e8ff] leading-tight">
             Ready to Secure Your<br />
-            <span className="bg-gradient-to-r from-[#7C3AED] via-[#6366F1] to-[#3B82F6] bg-clip-text text-transparent">Codebase?</span>
+            <span className="bg-gradient-to-r from-[#c084fc] via-[#a855f7] to-[#7c3aed] bg-clip-text text-transparent">Codebase?</span>
           </h2>
           <p className="text-[#94A3B8] mb-10 text-base max-w-md mx-auto leading-relaxed">
             Join ZeroTrace — the autonomous security engineer that never sleeps.
@@ -1113,14 +1113,14 @@ const Landing = () => {
           {user ? (
             <Link to="/dashboard"
               className="cta-btn inline-flex items-center gap-2.5 px-10 py-4 rounded-xl font-semibold text-white text-base tracking-wide"
-              style={{ background: "linear-gradient(135deg,#7C3AED,#3B82F6)" }}>
+              style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)" }}>
               Go to Dashboard <ArrowRight size={16} />
             </Link>
           ) : (
             <div className="flex flex-wrap gap-4 justify-center">
               <Link to="/signup"
                 className="cta-btn inline-flex items-center gap-2.5 px-10 py-4 rounded-xl font-semibold text-white text-base tracking-wide"
-                style={{ background: "linear-gradient(135deg,#7C3AED,#3B82F6)" }}>
+                style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)" }}>
                 Create Free Account <ArrowRight size={16} />
               </Link>
               <Link to="/login"
@@ -1143,8 +1143,8 @@ const Landing = () => {
             <div className="transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12">
               <img src="/logo.png" width={32} height={32} alt="Zero Trace" className="object-contain" />
             </div>
-            <span className="brand-name text-sm text-[#F9FAFB]">
-              ZERO<span className="bg-gradient-to-r from-[#7C3AED] to-[#3B82F6] bg-clip-text text-transparent">TRACE</span>
+            <span className="brand-name text-sm text-[#f3e8ff]">
+              ZERO<span className="bg-gradient-to-r from-[#c084fc] to-[#a855f7] bg-clip-text text-transparent">TRACE</span>
             </span>
           </Link>
           <p className="text-[11px] text-[#4B5563]">© 2026 ZeroTrace — Autonomous Security Intelligence</p>
