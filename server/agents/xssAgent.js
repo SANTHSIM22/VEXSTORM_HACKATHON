@@ -7,8 +7,8 @@ const { appendParam } = require('../utils/urlHelper');
 const XSS_TIMEOUT = 10000;
 
 class XSSAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('XSSAgent', 'A03 - Injection', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('XSSAgent', 'A03 - Injection', logger, memory, findingsStore, registryRef);
         this.validator = new ValidationEngine(logger);
         this.goal = "Identify Reflected, Stored, and DOM-based XSS vulnerabilities by reasoning about input reflections and analyzing browser-side execution sinks.";
     }

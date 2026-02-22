@@ -81,7 +81,8 @@ function generateMarkdown(report) {
         for (let i = 0; i < sorted.length; i++) {
             const f = sorted[i];
             const icon = { Critical: '🔴', High: '🟠', Medium: '🟡', Low: '🔵', Info: '⚪' }[f.severity] || '❓';
-            lines.push(`| ${i + 1} | ${icon} | ${f.type} | \`${f.endpoint.length > 50 ? f.endpoint.substring(0, 50) + '...' : f.endpoint}\` |`);
+            const manualTag = f.needsManualVerification ? ' ⚠️ (Needs Manual Verification)' : '';
+            lines.push(`| ${i + 1} | ${icon} | ${f.type}${manualTag} | \`${f.endpoint.length > 50 ? f.endpoint.substring(0, 50) + '...' : f.endpoint}\` |`);
         }
         lines.push('');
 
@@ -100,7 +101,8 @@ function generateMarkdown(report) {
             const [type, parameter] = groupKey.split('|');
             const icon = { Critical: '🔴', High: '🟠', Medium: '🟡', Low: '🔵', Info: '⚪' }[first.severity] || '❓';
 
-            lines.push(`### ${catIndex++}. ${type}${parameter !== 'N/A' ? ' (' + parameter + ')' : ''} [${icon} ${first.severity}]`);
+            const manualNote = first.needsManualVerification ? ' ⚠️ (Needs Manual Verification)' : '';
+            lines.push(`### ${catIndex++}. ${type}${parameter !== 'N/A' ? ' (' + parameter + ')' : ''} [${icon} ${first.severity}]${manualNote}`);
             lines.push(`**Description**: ${first.description}`);
 
             lines.push('| Endpoint | Proof / Evidence |');

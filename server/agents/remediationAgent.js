@@ -2,8 +2,8 @@ const BaseAgent = require('./baseAgent');
 const { generateRemediation } = require('../llm/mistralClient');
 
 class RemediationAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('RemediationAgent', 'Remediation', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('RemediationAgent', 'Remediation', logger, memory, findingsStore, registryRef);
     }
 
     async execute(target) {

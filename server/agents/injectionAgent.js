@@ -13,9 +13,95 @@ function filterTimingPayloads(payloads) {
 }
 
 class InjectionAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('InjectionAgent', 'A03 - Injection', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('InjectionAgent', 'A03 - Injection', logger, memory, findingsStore, registryRef);
         this.validator = new ValidationEngine(logger);
+    }
+
+    /* ── SQL-specific vs generic error detection ── */
+
+    /** Patterns that are strong evidence of SQL injection (DB-specific error messages) */
+    static SQL_SPECIFIC_PATTERNS = [
+        /SQL syntax.*MySQL/i,
+        /ORA-\d{5}/i,
+        /PostgreSQL.*ERROR/i,
+        /Microsoft.*ODBC.*SQL Server/i,
+        /SQLITE_ERROR/i,
+        /sqlite3\.OperationalError/i,
+        /pg_query\(\)/i,
+        /Unclosed quotation mark/i,
+        /quoted string not properly terminated/i,
+        /mysql_fetch/i,
+        /You have an error in your SQL syntax/i,
+        /supplied argument is not a valid MySQL/i,
+        /unterminated quoted string at or near/i,
+        /syntax error at or near/i,
+    ];
+
+    /** Patterns that only indicate a generic server error (NOT SQL-specific) */
+    static GENERIC_ERROR_PATTERNS = [
+        /at\s+\w+\s+\(.*:\d+:\d+\)/i,
+        /Traceback\s+\(most recent call/i,
+        /Exception in thread/i,
+        /Fatal error:/i,
+        /Stack trace:/i,
+        /Uncaught\s+\w*Error/i,
+        /Warning:.*\(\)/i,
+        /on line \d+/i,
+    ];
+
+    /**
+     * Classify evidence as sql-specific or generic, and compute a confidence
+     * score that reflects how likely the finding is a true SQL injection.
+     */
+    _calculateConfidence({ sqlPatternCount = 0, genericPatternCount = 0, authBypassed = false, serverError500 = false, timingAnomaly = false, anomalyScore = 0, dbErrorIn500 = false }) {
+        let score = 0.1; // base
+
+        // Auth bypass (200 + token) is the strongest signal — near certain
+        if (authBypassed) return 0.95;
+
+        // DB-specific error in a 500 response (e.g. SQLITE_ERROR when sending
+        // SQL payload) is strong proof the input reaches the DB unparameterized.
+        // This is classic error-based SQL injection confirmation.
+        if (dbErrorIn500) return 0.85;
+
+        // DB-specific error patterns in the response body (non-500 or general)
+        // still very strong — the engine name leaked means injected SQL reached it.
+        if (sqlPatternCount > 0) {
+            score += 0.55;                                 // first pattern = strong
+            score += Math.min((sqlPatternCount - 1) * 0.1, 0.15); // extra patterns
+            if (serverError500) score += 0.1;              // 500 + DB error = even stronger
+        }
+
+        // Generic server errors (stack traces, warnings) alone are NO LONGER
+        // flagged as SQL injection.  They only contribute a small bonus when
+        // SQL-specific patterns are already present.
+        if (genericPatternCount > 0 && sqlPatternCount > 0) {
+            score += 0.05;                                 // supplementary info only
+        }
+
+        // Response-diff anomaly is circumstantial
+        if (anomalyScore > 0.5) score += 0.1;
+
+        // Time-based anomaly adds a little
+        if (timingAnomaly) score += 0.1;
+
+        return Math.min(1.0, Math.max(0.05, score));
+    }
+
+    /**
+     * Detects SQL-specific vs generic error patterns separately.
+     * Returns { sqlPatterns, genericPatterns, allDetected }.
+     */
+    _classifyErrors(responseBody) {
+        const body = typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody || '');
+        const sqlMatches = InjectionAgent.SQL_SPECIFIC_PATTERNS.filter(p => p.test(body));
+        const genericMatches = InjectionAgent.GENERIC_ERROR_PATTERNS.filter(p => p.test(body));
+        return {
+            sqlPatterns: sqlMatches,
+            genericPatterns: genericMatches,
+            allDetected: sqlMatches.length + genericMatches.length > 0,
+        };
     }
 
     async execute(target) {
@@ -109,10 +195,10 @@ class InjectionAgent extends BaseAgent {
             payloads = filterTimingPayloads(payloads);
         } catch {
             payloads = [
-                "' OR '1'='1",
                 "' OR 1=1--",
+                "' OR '1'='1'--",
                 "' UNION SELECT NULL,NULL--",
-                "1' AND '1'='1",
+                "1' AND '1'='1'--",
             ];
         }
 
@@ -125,39 +211,54 @@ class InjectionAgent extends BaseAgent {
                 });
 
                 const comparison = this.validator.compareResponses(baseline, testResponse);
-                const stackTrace = this.validator.detectStackTrace(testResponse.data);
+                const errorInfo = this._classifyErrors(testResponse.data);
                 const timing = this.validator.detectTimingAnomaly(baseline.timingMs, testResponse.timingMs);
+
+                // Detect DB-specific error in 500 — strong confirmation
+                const responseStr = JSON.stringify(testResponse.data).toLowerCase();
+                const dbErrorIn500 = (comparison.statusChanged && testResponse.status >= 500) && (
+                    errorInfo.sqlPatterns.length > 0 ||
+                    /sqlite|mysql|postgres|oracle|mssql|sql server/i.test(responseStr)
+                );
 
                 let suspicious = false;
                 let evidence = [];
-                let consistencyScore = 0;
 
-                if (stackTrace.detected) {
+                if (errorInfo.sqlPatterns.length > 0) {
                     suspicious = true;
-                    evidence.push(`SQL error patterns detected: ${stackTrace.patterns.join(', ')}`);
-                    consistencyScore += 0.4;
+                    evidence.push(`SQL error patterns detected: ${errorInfo.sqlPatterns.map(p => p.source).join(', ')}`);
+                }
+
+                // Generic stack traces / error messages alone are NOT evidence
+                // of SQL injection — they can be triggered by any malformed input.
+                // Only log them as supplementary info when SQL patterns are also present.
+                if (errorInfo.genericPatterns.length > 0 && errorInfo.sqlPatterns.length > 0) {
+                    evidence.push(`Also found generic error patterns: ${errorInfo.genericPatterns.map(p => p.source).join(', ')}`);
                 }
 
                 if (timing.anomalous) {
                     suspicious = true;
                     evidence.push(`Time-based anomaly: ${timing.deltaMs}ms delay (ratio: ${timing.ratio.toFixed(2)}x)`);
-                    consistencyScore += 0.3;
                 }
 
                 if (comparison.statusChanged && testResponse.status >= 500) {
                     suspicious = true;
                     evidence.push(`Server error triggered: status ${testResponse.status}`);
-                    consistencyScore += 0.3;
                 }
 
-                if (comparison.anomalyScore > 0.5) {
-                    suspicious = true;
+                if (comparison.anomalyScore > 0.5 && evidence.length > 0) {
                     evidence.push(`High anomaly score: ${comparison.anomalyScore}`);
-                    consistencyScore += 0.2;
                 }
 
                 if (suspicious) {
-                    const confidence = this.validator.calculateConfidence(comparison.anomalyScore, consistencyScore);
+                    const confidence = this._calculateConfidence({
+                        sqlPatternCount: errorInfo.sqlPatterns.length,
+                        genericPatternCount: errorInfo.genericPatterns.length,
+                        serverError500: comparison.statusChanged && testResponse.status >= 500,
+                        dbErrorIn500,
+                        timingAnomaly: timing.anomalous,
+                        anomalyScore: comparison.anomalyScore,
+                    });
                     this.addFinding({
                         type: 'SQL Injection',
                         endpoint: url,
@@ -195,7 +296,7 @@ class InjectionAgent extends BaseAgent {
         const baselineResponse = await timedRequest(url, { timeout: INJECT_TIMEOUT });
         const baseline = this.validator.captureBaseline(baselineResponse);
 
-        const payloads = ["' OR '1'='1", "1 OR 1=1", "'; SELECT 1--", "' UNION SELECT NULL--"];
+        const payloads = ["' OR 1=1--", "1 OR 1=1--", "'; SELECT 1--", "' UNION SELECT NULL--"];
 
         for (const payload of payloads) {
             try {
@@ -203,11 +304,31 @@ class InjectionAgent extends BaseAgent {
                 const testResponse = await timedRequest(testUrl, { timeout: INJECT_TIMEOUT });
 
                 const comparison = this.validator.compareResponses(baseline, testResponse);
-                const stackTrace = this.validator.detectStackTrace(testResponse.data);
+                const errorInfo = this._classifyErrors(testResponse.data);
 
-                if (stackTrace.detected || comparison.anomalyScore > 0.5) {
-                    const confidence = this.validator.calculateConfidence(comparison.anomalyScore, stackTrace.detected ? 0.6 : 0.2);
-                    const evidenceStr = stackTrace.detected ? `Error patterns: ${stackTrace.patterns.join(', ')}` : `Anomaly score: ${comparison.anomalyScore}`;
+                // Detect DB-specific error in 500
+                const responseStr = JSON.stringify(testResponse.data).toLowerCase();
+                const dbErrorIn500 = (comparison.statusChanged && testResponse.status >= 500) && (
+                    errorInfo.sqlPatterns.length > 0 ||
+                    /sqlite|mysql|postgres|oracle|mssql|sql server/i.test(responseStr)
+                );
+
+                // Only flag if there is SQL-SPECIFIC evidence — generic stack traces
+                // alone (e.g. "at Function.call (/path:10:5)") are NOT SQL injection.
+                const hasSqlEvidence = errorInfo.sqlPatterns.length > 0 || dbErrorIn500;
+                if (hasSqlEvidence) {
+                    const confidence = this._calculateConfidence({
+                        sqlPatternCount: errorInfo.sqlPatterns.length,
+                        genericPatternCount: errorInfo.genericPatterns.length,
+                        serverError500: comparison.statusChanged && testResponse.status >= 500,
+                        dbErrorIn500,
+                        anomalyScore: comparison.anomalyScore,
+                    });
+                    const evidenceParts = [];
+                    if (errorInfo.sqlPatterns.length > 0) evidenceParts.push(`SQL error patterns: ${errorInfo.sqlPatterns.map(p => p.source).join(', ')}`);
+                    if (dbErrorIn500) evidenceParts.push(`DB error in ${testResponse.status} response`);
+                    if (comparison.anomalyScore > 0.5) evidenceParts.push(`Anomaly score: ${comparison.anomalyScore}`);
+                    const evidenceStr = evidenceParts.join('; ');
                     this.addFinding({
                         type: 'SQL Injection',
                         endpoint: url,
@@ -234,13 +355,18 @@ class InjectionAgent extends BaseAgent {
     }
     async _testApiInjection(url) {
         const findings = [];
+        // Payloads with -- comment terminators first (needed to close the rest of
+        // the original query and attempt actual exploitation / auth bypass).
+        // Without --, the remaining SQL causes a syntax error which is still
+        // useful for error-based detection but won't bypass auth.
         const payloads = [
             { email: "' OR 1=1--", password: "a" },
             { email: "admin'--", password: "a" },
-            { email: "' OR '1'='1", password: "a" },
+            { email: "' OR 1=1-- -", password: "a" },     // space-dash variant (MySQL)
+            { email: "' OR '1'='1'--", password: "a" },   // balanced quotes + comment
             { username: "' OR 1=1--", password: "a" },
-            { id: "1' OR '1'='1" },
-            { q: "apple' OR 1=1--" }
+            { id: "1 OR 1=1--" },
+            { q: "apple' OR 1=1--" },
         ];
 
         try {
@@ -251,23 +377,43 @@ class InjectionAgent extends BaseAgent {
             for (const payload of payloads) {
                 try {
                     const testResponse = await timedRequest(url, { method: 'POST', data: payload, timeout: INJECT_TIMEOUT });
-                    const stackTrace = this.validator.detectStackTrace(testResponse.data);
+                    const errorInfo = this._classifyErrors(testResponse.data);
 
                     let suspicious = false;
                     let evidenceStr = '';
+                    let authBypassed = false;
+
+                    // Check for DB-specific error in the raw response body (covers both
+                    // the errorInfo patterns AND substring checks like 'sqlite').
+                    const responseStr = JSON.stringify(testResponse.data).toLowerCase();
+                    const hasDbErrorIn500 = testResponse.status >= 500 && (
+                        errorInfo.sqlPatterns.length > 0 ||
+                        /sqlite|mysql|postgres|oracle|mssql|sql server/i.test(responseStr)
+                    );
 
                     if (testResponse.status === 200 && testResponse.data && testResponse.data.authentication) {
                         suspicious = true;
+                        authBypassed = true;
                         evidenceStr = "Authentication bypassed via SQL injection (200 OK with token)";
-                    } else if (stackTrace.detected) {
+                    } else if (hasDbErrorIn500) {
                         suspicious = true;
-                        evidenceStr = `SQL Error patterns: ${stackTrace.patterns.join(', ')}`;
-                    } else if (testResponse.status >= 500 && JSON.stringify(testResponse.data).toLowerCase().includes('sqlite')) {
+                        const dbName = (responseStr.match(/sqlite|mysql|postgres|oracle|mssql|sql server/i) || ['SQL'])[0];
+                        evidenceStr = `${dbName.toUpperCase()} database error in ${testResponse.status} response — injected SQL reached the DB engine unparameterized`;
+                    } else if (errorInfo.sqlPatterns.length > 0) {
                         suspicious = true;
-                        evidenceStr = `SQLite Error detected in 500 response`;
+                        evidenceStr = `SQL Error patterns: ${errorInfo.sqlPatterns.map(p => p.source).join(', ')}`;
                     }
+                    // Generic stack traces / error messages (e.g. "at Function (file:10:5)")
+                    // are NOT flagged as SQL injection — they can be triggered by any bad input.
 
                     if (suspicious) {
+                        const confidence = this._calculateConfidence({
+                            sqlPatternCount: errorInfo.sqlPatterns.length,
+                            genericPatternCount: errorInfo.genericPatterns.length,
+                            authBypassed,
+                            serverError500: testResponse.status >= 500,
+                            dbErrorIn500: hasDbErrorIn500,
+                        });
                         const payloadStr = JSON.stringify(payload);
                         this.addFinding({
                             type: 'SQL Injection',
@@ -276,7 +422,7 @@ class InjectionAgent extends BaseAgent {
                             description: `SQL injection vulnerability detected in API endpoint`,
                             evidence: evidenceStr,
                             payload: payloadStr,
-                            confidenceScore: 0.95,
+                            confidenceScore: confidence,
                             exploitScenario: `Attacker can send crafted JSON to bypass authentication or maliciously interact with the database`,
                             impact: 'Authentication bypass, Database compromise, Data exfiltration',
                             reproductionSteps: [

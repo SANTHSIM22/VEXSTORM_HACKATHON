@@ -2,8 +2,8 @@ const BaseAgent = require('./baseAgent');
 const { planScanStrategy } = require('../llm/mistralClient');
 
 class PlannerAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('PlannerAgent', 'Planning', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('PlannerAgent', 'Planning', logger, memory, findingsStore, registryRef);
     }
 
     async execute(target) {

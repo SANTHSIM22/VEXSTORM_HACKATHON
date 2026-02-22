@@ -2,8 +2,8 @@ const BaseAgent = require('./baseAgent');
 const { makeRequest } = require('../utils/httpClient');
 
 class LoggingAgent extends BaseAgent {
-    constructor(logger, memory, findingsStore) {
-        super('LoggingAgent', 'A09 - Logging & Monitoring Failures', logger, memory, findingsStore);
+    constructor(logger, memory, findingsStore, registryRef = null) {
+        super('LoggingAgent', 'A09 - Logging & Monitoring Failures', logger, memory, findingsStore, registryRef);
     }
 
     /**
@@ -116,18 +116,30 @@ class LoggingAgent extends BaseAgent {
             '/npm-debug.log', '/yarn-error.log', '/.logs', '/.log'
         ];
 
+        /** Patterns that indicate real log content (timestamps, log levels, stack traces) */
+        const LOG_CONTENT_RE = /\d{4}[-\/]\d{2}[-\/]\d{2}|\[(error|warn|info|debug|trace)\]|at\s+\S+\s+\(|exception|traceback|stacktrace|\[\d{2}:\d{2}:\d{2}\]/i;
+
         for (const path of logPaths) {
             try {
                 const response = await makeRequest(`${baseOrigin}${path}`, { retries: 1, timeout: 5000 });
                 if (response.status === 200) {
                     const body = typeof response.data === 'string' ? response.data : '';
-                    if (body.length > 50) {
+                    const contentType = (response.headers?.['content-type'] || '').toLowerCase();
+
+                    // Skip HTML responses — SPAs return 200 with the app shell for every route
+                    if (contentType.includes('text/html') || /^\s*<!doctype|^\s*<html/i.test(body)) {
+                        this.logger.debug?.(`[LoggingAgent] Skipping ${path} — response is HTML (SPA shell)`);
+                        continue;
+                    }
+
+                    // Require the body to actually look like log content
+                    if (body.length > 50 && LOG_CONTENT_RE.test(body)) {
                         this.addFinding({
                             type: 'Logging Failure',
                             endpoint: `${baseOrigin}${path}`,
                             parameter: 'N/A',
-                            description: `Potential log file accessible at ${path}`,
-                            evidence: `HTTP 200 with ${body.length} bytes of content`,
+                            description: `Log file accessible at ${path}`,
+                            evidence: `HTTP 200 with ${body.length} bytes of log content (content-type: ${contentType || 'unknown'})`,
                             confidenceScore: this._calculateConfidence({ vulnType: 'logFile', statusIs200: true, contentLength: body.length }),
                             exploitScenario: `Attacker reads ${path} to discover internal errors, user data, and system info`,
                             impact: 'Sensitive data exposure via logs',

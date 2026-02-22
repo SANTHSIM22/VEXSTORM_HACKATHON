@@ -37,7 +37,11 @@ class RiskEngine {
 
         const baseCvss = weights[finding.type] || 5.0;
         const confidenceFactor = finding.confidenceScore || 0.5;
-        return Math.round(Math.min(10.0, baseCvss * (0.7 + 0.3 * confidenceFactor)) * 10) / 10;
+        // Confidence only fine-tunes the score (±15% range), so the
+        // vulnerability TYPE still primarily determines severity.
+        // Old formula used ±30% which could drop Critical → High just
+        // because confidence was <0.73.
+        return Math.round(Math.min(10.0, baseCvss * (0.85 + 0.15 * confidenceFactor)) * 10) / 10;
     }
 
     determineSeverity(cvssScore) {
@@ -51,10 +55,14 @@ class RiskEngine {
     enrichFinding(finding) {
         const cvssScore = this.calculateCVSS(finding);
         const severity = this.determineSeverity(cvssScore);
+        const confidenceScore = finding.confidenceScore || 0;
+        // Flag findings with low confidence as needing manual verification
+        const needsManualVerification = confidenceScore > 0 && confidenceScore < 0.5;
         return {
             ...finding,
             cvssScore,
             severity,
+            needsManualVerification,
         };
     }
 }
