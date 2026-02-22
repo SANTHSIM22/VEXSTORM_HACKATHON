@@ -397,7 +397,9 @@ const Dashboard = () => {
     const poll = async () => {
       try {
         const res = await api.get(`/scans/${activeScanId}`);
-        setSelectedScan(res.data);
+        // Only overwrite selectedScan if the user is still viewing the running scan.
+        // If they've switched to view an old scan, preserve their selection.
+        setSelectedScan((prev) => prev?.scanId === activeScanId ? res.data : prev);
         setScans((prev) =>
           prev.map((s) =>
             s.scanId === activeScanId
@@ -1611,8 +1613,8 @@ const Dashboard = () => {
         {/* ── VULNERABILITIES TAB ── */}
         {tab === "vulnerabilities" && (
           <div className="animate-fadeIn">
-            {/* Scan selector */}
-            {scans.filter((s) => s.status === "completed").length > 0 && (
+            {/* Scan selector — shows all scans including running */}
+            {scans.length > 0 && (
               <div className="mb-5 flex items-center gap-3">
                 <label className="text-sm text-[#a78bfa]/60">Scan:</label>
                 <select
@@ -1621,14 +1623,26 @@ const Dashboard = () => {
                   className="px-3 py-1.5 rounded-lg text-sm text-[#f3e8ff] focus:outline-none cursor-pointer transition-colors input-focus"
                   style={{ background: "rgba(5,0,8,0.6)", border: "1px solid rgba(168,85,247,0.15)" }}
                 >
-                  {scans
-                    .filter((s) => s.status === "completed")
-                    .map((s) => (
-                      <option key={s.scanId} value={s.scanId}>
-                        {s.scanName || s.targetUrl} — {timeAgo(s.createdAt)}
-                      </option>
-                    ))}
+                  {scans.map((s) => (
+                    <option key={s.scanId} value={s.scanId}>
+                      {s.scanName || s.targetUrl}{s.status === "running" ? " ⟳ scanning..." : ""} — {timeAgo(s.createdAt)}
+                    </option>
+                  ))}
                 </select>
+                {selectedScan?.status === "running" && (
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-green-400 animate-pulse">
+                    <Loader2 size={12} className="animate-spin" /> Live
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* In-progress banner */}
+            {selectedScan?.status === "running" && (
+              <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-green-300"
+                style={{ background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.2)" }}>
+                <Loader2 size={16} className="animate-spin shrink-0" />
+                <span>Scan in progress — vulnerabilities are updating in real-time as agents report findings.</span>
               </div>
             )}
 
@@ -1637,7 +1651,7 @@ const Dashboard = () => {
                 <ShieldAlert size={48} className="mx-auto mb-4 text-[#94A3B8]/40" />
                 <p className="text-[#94A3B8]">
                   {selectedScan?.status === "running"
-                    ? "Scan in progress — vulnerabilities will appear when complete."
+                    ? "Agents are scanning — vulnerabilities will appear here as they are discovered."
                     : scans.length === 0
                     ? "No scans yet. Run a scan to discover vulnerabilities."
                     : "No vulnerabilities found in this scan."}
@@ -1869,8 +1883,8 @@ const Dashboard = () => {
         {/* ── FULL REPORT TAB ── */}
         {tab === "report" && (
           <div className="space-y-6 animate-fadeIn">
-            {/* Scan selector */}
-            {scans.filter((s) => s.status === "completed").length > 0 && (
+            {/* Scan selector — shows all scans including running */}
+            {scans.length > 0 && (
               <div className="flex items-center gap-3">
                 <label className="text-sm text-[#a78bfa]/60">Scan:</label>
                 <select
@@ -1879,26 +1893,36 @@ const Dashboard = () => {
                   className="px-3 py-1.5 rounded-lg text-sm text-[#f3e8ff] focus:outline-none cursor-pointer"
                   style={{ background: "rgba(5,0,8,0.6)", border: "1px solid rgba(168,85,247,0.15)" }}
                 >
-                  {scans.filter((s) => s.status === "completed").map((s) => (
+                  {scans.map((s) => (
                     <option key={s.scanId} value={s.scanId}>
-                      {s.scanName || s.targetUrl} — {timeAgo(s.createdAt)}
+                      {s.scanName || s.targetUrl}{s.status === "running" ? " ⟳ scanning..." : ""} — {timeAgo(s.createdAt)}
                     </option>
                   ))}
                 </select>
+                {selectedScan?.status === "running" && (
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-green-400 animate-pulse">
+                    <Loader2 size={12} className="animate-spin" /> Live
+                  </span>
+                )}
               </div>
             )}
 
-            {!selectedScan || selectedScan.status !== "completed" ? (
+            {!selectedScan ? (
               <div className="p-12 rounded-xl text-center" style={glass}>
                 <FileText size={48} className="mx-auto mb-4 text-[#94A3B8]/40" />
-                <p className="text-[#94A3B8]">
-                  {selectedScan?.status === "running"
-                    ? "Scan in progress — the full report will appear when complete."
-                    : "No completed scans yet. Run a scan to generate a full report."}
-                </p>
+                <p className="text-[#94A3B8]">No scans yet. Run a scan to generate a full report.</p>
               </div>
             ) : (
               <>
+                {/* In-progress banner */}
+                {selectedScan.status === "running" && (
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-green-300"
+                    style={{ background: "rgba(34,197,94,0.07)", border: "1px solid rgba(34,197,94,0.2)" }}>
+                    <Loader2 size={16} className="animate-spin shrink-0" />
+                    <span>Scan in progress — data updates in real-time as agents complete their work. The full report will be finalised when the scan finishes.</span>
+                  </div>
+                )}
+
                 {/* ── Scan Summary ── */}
                 <div className="rounded-xl p-6" style={glass}>
                   <div className="flex items-center gap-2 mb-5">
