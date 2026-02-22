@@ -3,7 +3,7 @@
   "publisher": "santhsim",
   "displayName": "ZeroTrace",
   "description": "Multi-agent AI Security Scanner powered by LangGraph + Mistral",
-  "version": "5.0.0",
+  "version": "6.0.0",
   "icon": "media/zerotrace.png",
   "engines": {
     "vscode": "^1.109.0"
