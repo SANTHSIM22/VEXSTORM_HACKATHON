@@ -88,8 +88,8 @@
         },
         "zerotrace.dashboardUrl": {
           "type": "string",
-          "default": "http://localhost:5000",
-          "description": "Base URL of the ZeroTrace dashboard backend server (e.g. http://localhost:5000)"
+          "default": "https://vexstorm-hackathon-2.onrender.com",
+          "description": "Base URL of the ZeroTrace dashboard backend server (e.g. https://vexstorm-hackathon-2.onrender.com)"
         },
         "zerotrace.dashboardEmail": {
           "type": "string",
